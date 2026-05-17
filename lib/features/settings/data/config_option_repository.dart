@@ -184,6 +184,33 @@ abstract class ConfigOptions {
     validator: (value) => value > 0,
   );
 
+  static final enableDynamicDirectBypass = PreferencesNotifier.create<bool, bool>("enable-dynamic-direct-bypass", true);
+
+  static final dynamicDirectBypassThreshold = PreferencesNotifier.create<int, int>(
+    "dynamic-direct-bypass-threshold",
+    64,
+    validator: (value) => value > 0,
+  );
+
+  static final dynamicDirectBypassTtl = PreferencesNotifier.create<Duration, int>(
+    "dynamic-direct-bypass-ttl",
+    const Duration(minutes: 30),
+    mapFrom: const IntervalInSecondsConverter().fromJson,
+    mapTo: const IntervalInSecondsConverter().toJson,
+  );
+
+  static final dynamicDirectBypassMaxRoutes = PreferencesNotifier.create<int, int>(
+    "dynamic-direct-bypass-max-routes",
+    512,
+    validator: (value) => value > 0,
+  );
+
+  static final dynamicDirectBypassMaxRoutesPerHost = PreferencesNotifier.create<int, int>(
+    "dynamic-direct-bypass-max-routes-per-host",
+    32,
+    validator: (value) => value > 0,
+  );
+
   static final enableFakeDns = PreferencesNotifier.create<bool, bool>("enable-fake-dns", false);
 
   // static final enableDnsRouting = PreferencesNotifier.create<bool, bool>("enable-dns-routing", true);
@@ -341,6 +368,11 @@ abstract class ConfigOptions {
     "allow-connection-from-lan": allowConnectionFromLan,
     "direct-route-connection-limit": directRouteConnectionLimit,
     "proxy-route-connection-limit": proxyRouteConnectionLimit,
+    "enable-dynamic-direct-bypass": enableDynamicDirectBypass,
+    "dynamic-direct-bypass-threshold": dynamicDirectBypassThreshold,
+    "dynamic-direct-bypass-ttl": dynamicDirectBypassTtl,
+    "dynamic-direct-bypass-max-routes": dynamicDirectBypassMaxRoutes,
+    "dynamic-direct-bypass-max-routes-per-host": dynamicDirectBypassMaxRoutesPerHost,
     // "enable-dns-routing": enableDnsRouting,
 
     // mux
@@ -453,6 +485,11 @@ abstract class ConfigOptions {
       allowConnectionFromLan: ref.watch(allowConnectionFromLan),
       directRouteConnectionLimit: ref.watch(directRouteConnectionLimit),
       proxyRouteConnectionLimit: ref.watch(proxyRouteConnectionLimit),
+      enableDynamicDirectBypass: ref.watch(enableDynamicDirectBypass),
+      dynamicDirectBypassThreshold: ref.watch(dynamicDirectBypassThreshold),
+      dynamicDirectBypassTtl: ref.watch(dynamicDirectBypassTtl),
+      dynamicDirectBypassMaxRoutes: ref.watch(dynamicDirectBypassMaxRoutes),
+      dynamicDirectBypassMaxRoutesPerHost: ref.watch(dynamicDirectBypassMaxRoutesPerHost),
       enableFakeDns: ref.watch(enableFakeDns),
       // enableDnsRouting: ref.watch(enableDnsRouting),
       independentDnsCache: ref.watch(independentDnsCache),

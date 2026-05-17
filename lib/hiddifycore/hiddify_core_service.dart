@@ -34,7 +34,7 @@ class HiddifyCoreService with InfraLogger {
 
   CoreStatus currentState = const CoreStatus.stopped();
   final statusController = BehaviorSubject<CoreStatus>();
-  final logController = BehaviorSubject<List<LogMessage>>();
+  final logController = BehaviorSubject<List<LogMessage>>.seeded(const <LogMessage>[]);
   final CallOptions? grpcOptions = null; //CallOptions(timeout: const Duration(milliseconds: 10000));
   final Map<String, StreamSubscription?> subscriptions = {};
   List<OutboundGroup> latest = [];
@@ -73,6 +73,11 @@ class HiddifyCoreService with InfraLogger {
       "allowLan=${options.allowConnectionFromLan}, "
       "directRouteConnectionLimit=${options.directRouteConnectionLimit}, "
       "proxyRouteConnectionLimit=${options.proxyRouteConnectionLimit}, "
+      "dynamicDirectBypass=${options.enableDynamicDirectBypass}, "
+      "dynamicDirectBypassThreshold=${options.dynamicDirectBypassThreshold}, "
+      "dynamicDirectBypassTtl=${options.dynamicDirectBypassTtl.inSeconds}s, "
+      "dynamicDirectBypassMaxRoutes=${options.dynamicDirectBypassMaxRoutes}, "
+      "dynamicDirectBypassMaxRoutesPerHost=${options.dynamicDirectBypassMaxRoutesPerHost}, "
       "fakeDns=${options.enableFakeDns}, "
       "independentDnsCache=${options.independentDnsCache}",
     );
@@ -115,7 +120,7 @@ class HiddifyCoreService with InfraLogger {
       );
       loggy.info(
         "core generated config [$phase] custom: "
-        "${_summarizeConfigMap(decoded["custom"], ["hiddify-route-direct-connection-limit", "hiddify-route-proxy-connection-limit"])}",
+        "${_summarizeConfigMap(decoded["custom"], ["hiddify-route-direct-connection-limit", "hiddify-route-proxy-connection-limit", "hiddify-dynamic-direct-bypass-enabled", "hiddify-dynamic-direct-bypass-threshold", "hiddify-dynamic-direct-bypass-ttl", "hiddify-dynamic-direct-bypass-max-routes", "hiddify-dynamic-direct-bypass-max-routes-per-host"])}",
       );
       loggy.info(
         "core generated config [$phase] proxy groups: "
@@ -524,6 +529,7 @@ class HiddifyCoreService with InfraLogger {
   // SingboxConfigOption? latestOptions;
 
   Stream<List<LogMessage>> watchLogs(String path) async* {
+    yield List<LogMessage>.unmodifiable(logBuffer);
     if (!core.isInitialized()) {
       loggy.debug("core is not initialized, returning empty log stream");
       return;
@@ -559,6 +565,7 @@ class HiddifyCoreService with InfraLogger {
     return TaskEither(() async {
       loggy.debug("clearing logs");
       logBuffer.clear();
+      logController.add(const <LogMessage>[]);
       // final res = await core.bgClient(Empty());
       // if (res.code != ResponseCode.OK) return left("${res.code} ${res.message}");
       return right(unit);
