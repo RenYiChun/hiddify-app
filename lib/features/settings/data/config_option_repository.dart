@@ -59,7 +59,6 @@ abstract class ConfigOptions {
     "tcp://8.8.8.8",
     possibleValues: List.of([
       "local",
-      // "udp://223.5.5.5",
       // "udp://1.1.1.1",
       // "udp://1.1.1.2",
       "tcp://8.8.8.8",
@@ -83,7 +82,7 @@ abstract class ConfigOptions {
     "udp://1.1.1.1",
     possibleValues: List.of([
       "local",
-      "udp://223.5.5.5",
+      "tcp://223.5.5.5",
       "udp://1.1.1.1",
       "udp://1.1.1.2",
       "tcp://1.1.1.1",
@@ -92,7 +91,7 @@ abstract class ConfigOptions {
       "4.4.2.2",
       "8.8.8.8",
     ]),
-    defaultValueFunction: (ref) => ref.read(region) == Region.cn ? "223.5.5.5" : "1.1.1.1",
+    defaultValueFunction: (ref) => ref.read(region) == Region.cn ? "tcp://223.5.5.5" : "1.1.1.1",
     validator: (value) => value.isNotBlank,
   );
 
@@ -172,6 +171,18 @@ abstract class ConfigOptions {
   static final bypassLan = PreferencesNotifier.create<bool, bool>("bypass-lan", false);
 
   static final allowConnectionFromLan = PreferencesNotifier.create<bool, bool>("allow-connection-from-lan", false);
+
+  static final directRouteConnectionLimit = PreferencesNotifier.create<int, int>(
+    "direct-route-connection-limit",
+    2048,
+    validator: (value) => value > 0,
+  );
+
+  static final proxyRouteConnectionLimit = PreferencesNotifier.create<int, int>(
+    "proxy-route-connection-limit",
+    256,
+    validator: (value) => value > 0,
+  );
 
   static final enableFakeDns = PreferencesNotifier.create<bool, bool>("enable-fake-dns", false);
 
@@ -328,6 +339,8 @@ abstract class ConfigOptions {
     "clash-api-port": clashApiPort,
     "bypass-lan": bypassLan,
     "allow-connection-from-lan": allowConnectionFromLan,
+    "direct-route-connection-limit": directRouteConnectionLimit,
+    "proxy-route-connection-limit": proxyRouteConnectionLimit,
     // "enable-dns-routing": enableDnsRouting,
 
     // mux
@@ -438,6 +451,8 @@ abstract class ConfigOptions {
       setSystemProxy: mode == ServiceMode.systemProxy,
       bypassLan: ref.watch(bypassLan),
       allowConnectionFromLan: ref.watch(allowConnectionFromLan),
+      directRouteConnectionLimit: ref.watch(directRouteConnectionLimit),
+      proxyRouteConnectionLimit: ref.watch(proxyRouteConnectionLimit),
       enableFakeDns: ref.watch(enableFakeDns),
       // enableDnsRouting: ref.watch(enableDnsRouting),
       independentDnsCache: ref.watch(independentDnsCache),

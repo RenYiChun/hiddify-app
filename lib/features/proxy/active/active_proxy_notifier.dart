@@ -85,7 +85,7 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
     yield* proxyprovider
         .watchActiveProxies()
         .map((event) => event.getOrElse((l) => List<OutboundGroup>.empty()))
-        .map((event) => event.firstOrNull?.items.first ?? OutboundInfo());
+        .map(_resolveActiveProxyInfo);
   }
 
   final _urlTestThrottler = Throttler(const Duration(seconds: 1));
@@ -102,4 +102,38 @@ class ActiveProxyNotifier extends _$ActiveProxyNotifier with AppLogger {
       }
     });
   }
+}
+
+OutboundInfo _resolveActiveProxyInfo(List<OutboundGroup> groups) {
+  if (groups.isEmpty) return OutboundInfo();
+
+  final groupsByTag = <String, OutboundGroup>{
+    for (final group in groups)
+      if (group.tag.isNotEmpty) group.tag: group,
+  };
+
+  var group = groupsByTag["select"] ?? groups.first;
+  final visited = <String>{};
+  OutboundInfo? selectedInfo;
+
+  while (visited.add(group.tag)) {
+    selectedInfo = _selectedItem(group);
+    if (selectedInfo == null) break;
+
+    final nestedGroup = selectedInfo.isGroup ? groupsByTag[selectedInfo.tag] : null;
+    if (nestedGroup == null) break;
+    group = nestedGroup;
+  }
+
+  return selectedInfo ?? OutboundInfo();
+}
+
+OutboundInfo? _selectedItem(OutboundGroup group) {
+  if (group.items.isEmpty) return null;
+  for (final item in group.items) {
+    if (item.tag == group.selected || item.isSelected) {
+      return item;
+    }
+  }
+  return group.items.first;
 }

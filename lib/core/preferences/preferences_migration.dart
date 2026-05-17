@@ -11,7 +11,13 @@ class PreferencesMigration with InfraLogger {
   Future<void> migrate() async {
     final currentVersion = sharedPreferences.getInt(versionKey) ?? 0;
 
-    final migrationSteps = [PreferencesVersion1Migration(sharedPreferences)];
+    final List<PreferencesMigrationStep> migrationSteps = [
+      PreferencesVersion1Migration(sharedPreferences),
+      PreferencesVersion2Migration(sharedPreferences),
+      PreferencesVersion3Migration(sharedPreferences),
+      PreferencesVersion4Migration(sharedPreferences),
+      PreferencesVersion5Migration(sharedPreferences),
+    ];
 
     if (currentVersion == migrationSteps.length) {
       loggy.debug("already using the latest version (v$currentVersion)");
@@ -27,6 +33,83 @@ class PreferencesMigration with InfraLogger {
     }
     stopWatch.stop();
     loggy.debug("migration took [${stopWatch.elapsedMilliseconds}]ms");
+  }
+}
+
+const _directDnsAddressKey = "direct-dns-address";
+const _aliDnsDoHAddress = "https://223.5.5.5/dns-query";
+const _aliDnsTcpAddress = "tcp://223.5.5.5";
+const _aliDnsDomainDoHAddress = "https://dns.alidns.com/dns-query";
+
+class PreferencesVersion2Migration extends PreferencesMigrationStep with InfraLogger {
+  PreferencesVersion2Migration(super.sharedPreferences);
+
+  @override
+  Future<void> migrate() async {
+    if (sharedPreferences.getString(_directDnsAddressKey) case final String directDnsAddress
+        when _isLegacyAliDnsAddress(directDnsAddress)) {
+      loggy.debug("changing direct DNS from [$directDnsAddress] to [$_aliDnsTcpAddress]");
+      await sharedPreferences.setString(_directDnsAddressKey, _aliDnsTcpAddress);
+    }
+  }
+
+  bool _isLegacyAliDnsAddress(String directDnsAddress) {
+    final value = directDnsAddress.trim().toLowerCase();
+    return value == "223.5.5.5" ||
+        value == "udp://223.5.5.5" ||
+        value == "tcp://223.5.5.5" ||
+        value == _aliDnsDoHAddress ||
+        value == _aliDnsDomainDoHAddress;
+  }
+}
+
+class PreferencesVersion3Migration extends PreferencesMigrationStep with InfraLogger {
+  PreferencesVersion3Migration(super.sharedPreferences);
+
+  @override
+  Future<void> migrate() async {
+    if (sharedPreferences.getString(_directDnsAddressKey) case final String directDnsAddress
+        when _isAliDnsDoHAddress(directDnsAddress)) {
+      loggy.debug("changing direct DNS from [$directDnsAddress] to [$_aliDnsTcpAddress]");
+      await sharedPreferences.setString(_directDnsAddressKey, _aliDnsTcpAddress);
+    }
+  }
+
+  bool _isAliDnsDoHAddress(String directDnsAddress) {
+    final value = directDnsAddress.trim().toLowerCase();
+    return value == _aliDnsDoHAddress || value == _aliDnsDomainDoHAddress;
+  }
+}
+
+class PreferencesVersion4Migration extends PreferencesMigrationStep with InfraLogger {
+  PreferencesVersion4Migration(super.sharedPreferences);
+
+  @override
+  Future<void> migrate() async {
+    if (sharedPreferences.getString(_directDnsAddressKey) case final String directDnsAddress
+        when directDnsAddress.trim().toLowerCase() == _aliDnsDoHAddress) {
+      loggy.debug("changing direct DNS from [$directDnsAddress] to [$_aliDnsTcpAddress]");
+      await sharedPreferences.setString(_directDnsAddressKey, _aliDnsTcpAddress);
+    }
+  }
+}
+
+const _directRouteConnectionLimitKey = "direct-route-connection-limit";
+const _proxyRouteConnectionLimitKey = "proxy-route-connection-limit";
+
+class PreferencesVersion5Migration extends PreferencesMigrationStep with InfraLogger {
+  PreferencesVersion5Migration(super.sharedPreferences);
+
+  @override
+  Future<void> migrate() async {
+    if (sharedPreferences.getInt(_directRouteConnectionLimitKey) case 512) {
+      loggy.debug("changing direct route connection limit from [512] to [2048]");
+      await sharedPreferences.setInt(_directRouteConnectionLimitKey, 2048);
+    }
+    if (sharedPreferences.getInt(_proxyRouteConnectionLimitKey) case 128) {
+      loggy.debug("changing proxy route connection limit from [128] to [256]");
+      await sharedPreferences.setInt(_proxyRouteConnectionLimitKey, 256);
+    }
   }
 }
 

@@ -29,6 +29,11 @@ sealed class ConnectionStatus with _$ConnectionStatus {
     _ => false,
   };
 
+  ConnectionStatus withConnectivityDelay(int urlTestDelay) => switch (this) {
+    Connected() when urlTestDelay <= 0 || urlTestDelay >= 65000 => const Connecting(),
+    _ => this,
+  };
+
   String format() => switch (this) {
     Disconnected(:final connectionFailure) =>
       connectionFailure != null ? "CONNECTION FAILURE: $connectionFailure" : "DISCONNECTED",

@@ -61,11 +61,11 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
         key: 'connection',
         label: switch (connection) {
           Disconnected() => t.connection.connect,
-          Connecting() => t.connection.connecting,
+          Connecting() => t.connection.disconnect,
           Connected() => t.connection.disconnect,
           Disconnecting() => t.connection.disconnecting,
         },
-        disabled: connection.isSwitching,
+        disabled: connection is Disconnecting,
       ),
       MenuItem.submenu(
         label: t.pages.settings.inbound.serviceMode,
@@ -116,11 +116,7 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
   }
 
   ConnectionStatus _modifyConnectionStatus(ConnectionStatus connection, int urlTestDelay) {
-    if (connection is Connected) {
-      return urlTestDelay > 0 && urlTestDelay < 65000 ? const Connected() : const Connecting();
-    } else {
-      return connection;
-    }
+    return connection.withConnectivityDelay(urlTestDelay);
   }
 
   @override
@@ -131,7 +127,12 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
     if (menuItem.key == 'dashboard') {
       await ref.read(windowNotifierProvider.notifier).show();
     } else if (menuItem.key == 'connection') {
-      await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+      final connection = ref.read(connectionNotifierProvider).valueOrNull;
+      if (connection is Connecting) {
+        await ref.read(connectionNotifierProvider.notifier).abortConnection();
+      } else {
+        await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+      }
     } else if (menuItem.key == 'quit') {
       await ref.read(windowNotifierProvider.notifier).exit();
     } else {

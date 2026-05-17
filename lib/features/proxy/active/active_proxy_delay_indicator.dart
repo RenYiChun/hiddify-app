@@ -7,21 +7,61 @@ import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class ActiveProxyDelayIndicator extends HookConsumerWidget with InfraLogger {
+class ActiveProxyDelayIndicator extends ConsumerStatefulWidget {
   const ActiveProxyDelayIndicator({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ActiveProxyDelayIndicator> createState() => _ActiveProxyDelayIndicatorState();
+}
+
+class _ActiveProxyDelayIndicatorState extends ConsumerState<ActiveProxyDelayIndicator> with InfraLogger {
+  int? _delay;
+  ProviderSubscription<int?>? _activeProxyDelaySubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeProxyDelaySubscription = ref.listenManual<int?>(
+      activeProxyNotifierProvider.select((value) => value.valueOrNull?.urlTestDelay),
+      (_, next) => _setDelayAfterFrame(next),
+      fireImmediately: false,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _setDelay(ref.read(activeProxyNotifierProvider).valueOrNull?.urlTestDelay);
+    });
+  }
+
+  @override
+  void dispose() {
+    _activeProxyDelaySubscription?.close();
+    super.dispose();
+  }
+
+  void _setDelayAfterFrame(int? delay) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _setDelay(delay);
+    });
+  }
+
+  void _setDelay(int? delay) {
+    if (_delay == delay) return;
+    setState(() {
+      _delay = delay;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final t = ref.watch(translationsProvider).requireValue;
-    final activeProxy = ref.watch(activeProxyNotifierProvider);
     final theme = Theme.of(context);
 
-    if (activeProxy is! AsyncData) {
+    final delay = _delay;
+    if (delay == null) {
       return const SizedBox(); // Avoid building widget if data is not available
     }
 
-    final proxy = activeProxy.value!;
-    final delay = proxy.urlTestDelay;
     final timeout = delay > 65000;
 
     return Center(

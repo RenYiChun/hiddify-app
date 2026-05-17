@@ -10,16 +10,57 @@ import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class ActiveProxyFooter extends ConsumerWidget with InfraLogger {
+class ActiveProxyFooter extends ConsumerStatefulWidget {
   const ActiveProxyFooter({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ActiveProxyFooter> createState() => _ActiveProxyFooterState();
+}
+
+class _ActiveProxyFooterState extends ConsumerState<ActiveProxyFooter> with InfraLogger {
+  OutboundInfo? _activeProxy;
+  ProviderSubscription<OutboundInfo?>? _activeProxySubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _activeProxySubscription = ref.listenManual<OutboundInfo?>(
+      activeProxyNotifierProvider.select((value) => value.valueOrNull),
+      (_, next) => _setActiveProxyAfterFrame(next),
+      fireImmediately: false,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _setActiveProxy(ref.read(activeProxyNotifierProvider).valueOrNull);
+    });
+  }
+
+  @override
+  void dispose() {
+    _activeProxySubscription?.close();
+    super.dispose();
+  }
+
+  void _setActiveProxyAfterFrame(OutboundInfo? activeProxy) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _setActiveProxy(activeProxy);
+    });
+  }
+
+  void _setActiveProxy(OutboundInfo? activeProxy) {
+    if (_activeProxy == activeProxy) return;
+    setState(() {
+      _activeProxy = activeProxy;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final connectionState = ref.watch(
       connectionNotifierProvider.select((value) => value.valueOrNull ?? const Disconnected()),
     );
-
-    final activeProxy = ref.watch(activeProxyNotifierProvider.select((value) => value.valueOrNull));
+    final activeProxy = _activeProxy;
     final t = ref.watch(translationsProvider).requireValue;
 
     // Early return if required data is not available
@@ -44,10 +85,14 @@ class ActiveProxyFooter extends ConsumerWidget with InfraLogger {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       padding: const EdgeInsets.symmetric(vertical: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.background.withOpacity(1),
+        color: theme.colorScheme.surface.withValues(alpha: 1),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: theme.colorScheme.secondary.withOpacity(.21), blurRadius: 10, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: theme.colorScheme.secondary.withValues(alpha: .21),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: InkWell(

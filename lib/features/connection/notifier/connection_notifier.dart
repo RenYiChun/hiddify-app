@@ -100,13 +100,17 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
         return _disconnect();
       }
       loggy.info("active profile changed, reconnecting");
-      await ref.read(Preferences.startedByUser.notifier).update(true);
-      await _connectionRepo.reconnect(profile, ref.read(Preferences.disableMemoryLimit)).mapLeft((err) async {
+      final startedByUser = ref.read(Preferences.startedByUser.notifier);
+      final disableMemoryLimit = ref.read(Preferences.disableMemoryLimit);
+      final connectionRepo = _connectionRepo;
+      final dialogNotifier = ref.read(dialogNotifierProvider.notifier);
+      final t = ref.read(translationsProvider).requireValue;
+
+      await startedByUser.update(true);
+      await connectionRepo.reconnect(profile, disableMemoryLimit).mapLeft((err) async {
         loggy.warning("error reconnecting", err);
         state = AsyncError(err, StackTrace.current);
-        await ref
-            .read(dialogNotifierProvider.notifier)
-            .showCustomAlertFromErr(err.present(ref.read(translationsProvider).requireValue));
+        await dialogNotifier.showCustomAlertFromErr(err.present(t));
       }).run();
     }
   }
@@ -136,34 +140,39 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   }
 
   Future<void> _connectThrottled() async {
-    final activeProfile = await ref.read(activeProfileProvider.future);
+    final activeProfileFuture = ref.read(activeProfileProvider.future);
+    final disableMemoryLimit = ref.read(Preferences.disableMemoryLimit);
+    final connectionRepo = _connectionRepo;
+    final dialogNotifier = ref.read(dialogNotifierProvider.notifier);
+    final t = ref.read(translationsProvider).requireValue;
+    final startedByUser = ref.read(Preferences.startedByUser.notifier);
+
+    final activeProfile = await activeProfileFuture;
     if (activeProfile == null) {
       loggy.info("no active profile, not connecting");
       return;
     }
-    await _connectionRepo.connect(activeProfile, ref.read(Preferences.disableMemoryLimit)).mapLeft((
-      ConnectionFailure err,
-    ) async {
+    await connectionRepo.connect(activeProfile, disableMemoryLimit).mapLeft((ConnectionFailure err) async {
       loggy.warning("error connecting", err);
       //Go err is not normal object to see the go errors are string and need to be dumped
-      await ref
-          .read(dialogNotifierProvider.notifier)
-          .showCustomAlertFromErr(err.present(ref.read(translationsProvider).requireValue));
+      await dialogNotifier.showCustomAlertFromErr(err.present(t));
       loggy.warning(err);
       if (err.toString().contains("panic")) {
         await Sentry.captureException(Exception(err.toString()));
       }
-      await ref.read(Preferences.startedByUser.notifier).update(false);
+      await startedByUser.update(false);
       state = AsyncError(err, StackTrace.current);
     }).run();
   }
 
   Future<void> _disconnect() async {
-    await _connectionRepo.disconnect().mapLeft((err) {
+    final connectionRepo = _connectionRepo;
+    final dialogNotifier = ref.read(dialogNotifierProvider.notifier);
+    final t = ref.read(translationsProvider).requireValue;
+
+    await connectionRepo.disconnect().mapLeft((err) {
       loggy.warning("error disconnecting", err);
-      ref
-          .read(dialogNotifierProvider.notifier)
-          .showCustomAlertFromErr(err.present(ref.read(translationsProvider).requireValue));
+      dialogNotifier.showCustomAlertFromErr(err.present(t));
       state = AsyncError(err, StackTrace.current);
     }).run();
   }

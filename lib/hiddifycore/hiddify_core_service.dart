@@ -1,32 +1,28 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:math';
+import 'dart:io';
 
 import 'package:fpdart/fpdart.dart';
 import 'package:grpc/grpc.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
-import 'package:hiddify/core/model/directories.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
+import 'package:hiddify/features/log/model/log_level.dart' as config_log_level;
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
-import 'package:hiddify/hiddifycore/core_interface/core_interface.dart';
+import 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper_stub.dart'
+    if (dart.library.io) 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcommon/common.pb.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore_service.pbgrpc.dart';
 import 'package:hiddify/hiddifycore/init_signal.dart';
-import 'package:hiddify/singbox/model/singbox_config_option.dart';
-import 'package:hiddify/features/log/model/log_level.dart' as config_log_level;
 import 'package:hiddify/singbox/model/core_status.dart';
+import 'package:hiddify/singbox/model/singbox_config_option.dart';
 import 'package:hiddify/singbox/model/warp_account.dart';
-
-import 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper_stub.dart'
-    if (dart.library.io) 'package:hiddify/hiddifycore/core_interface/core_interface_wrapper.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:loggy/loggy.dart' as loggyl;
-import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:rxdart/rxdart.dart';
 
 class HiddifyCoreService with InfraLogger {
@@ -42,6 +38,159 @@ class HiddifyCoreService with InfraLogger {
   final CallOptions? grpcOptions = null; //CallOptions(timeout: const Duration(milliseconds: 10000));
   final Map<String, StreamSubscription?> subscriptions = {};
   List<OutboundGroup> latest = [];
+  String? _lastActiveGroupDiagnostics;
+
+  Future<void> _triggerActiveUrlTest(String phase) async {
+    try {
+      final res = await core.bgClient.urlTest(
+        UrlTestRequest(tag: ""),
+        options: CallOptions(timeout: const Duration(seconds: 2)),
+      );
+      if (res.code != ResponseCode.OK) {
+        loggy.warning("active url test [$phase] failed: ${res.code} ${res.message}");
+      } else {
+        loggy.info("active url test [$phase] queued");
+      }
+    } catch (error, stackTrace) {
+      loggy.warning("active url test [$phase] could not be queued", error, stackTrace);
+    }
+  }
+
+  void _logConfigOptionDiagnostics(SingboxConfigOption options) {
+    loggy.info(
+      "core options: "
+      "enableTun=${options.enableTun}, "
+      "setSystemProxy=${options.setSystemProxy}, "
+      "ipv6Mode=${options.ipv6Mode}, "
+      "directDns=${options.directDnsAddress}, "
+      "directDnsStrategy=${options.directDnsDomainStrategy}, "
+      "remoteDns=${options.remoteDnsAddress}, "
+      "remoteDnsStrategy=${options.remoteDnsDomainStrategy}, "
+      "strictRoute=${options.strictRoute}, "
+      "tun=${options.tunImplementation}, "
+      "mtu=${options.mtu}, "
+      "bypassLan=${options.bypassLan}, "
+      "allowLan=${options.allowConnectionFromLan}, "
+      "directRouteConnectionLimit=${options.directRouteConnectionLimit}, "
+      "proxyRouteConnectionLimit=${options.proxyRouteConnectionLimit}, "
+      "fakeDns=${options.enableFakeDns}, "
+      "independentDnsCache=${options.independentDnsCache}",
+    );
+  }
+
+  Future<void> _logGeneratedConfigDiagnostics(String phase) async {
+    try {
+      final directories = ref.read(appDirectoriesProvider).requireValue;
+      final configFile = File(
+        "${directories.workingDir.path}${Platform.pathSeparator}data${Platform.pathSeparator}current-config.json",
+      );
+      if (!await configFile.exists()) {
+        loggy.debug("core generated config [$phase]: missing at ${configFile.path}");
+        return;
+      }
+
+      final decoded = jsonDecode(await configFile.readAsString());
+      if (decoded is! Map<String, dynamic>) {
+        loggy.warning("core generated config [$phase]: unexpected json shape");
+        return;
+      }
+
+      final dns = decoded["dns"];
+      final route = decoded["route"];
+      loggy.info(
+        "core generated config [$phase] inbounds: "
+        "${_summarizeConfigEntries(decoded["inbounds"], ["tag", "type", "address", "stack", "mtu", "auto_route", "strict_route", "route_exclude_address", "listen", "listen_port", "set_system_proxy"])}",
+      );
+      loggy.info(
+        "core generated config [$phase] dns servers: "
+        "${_summarizeConfigEntries(dns is Map ? dns["servers"] : null, ["tag", "type", "server", "server_port", "detour", "domain_resolver", "connect_timeout", "servers", "parallel"])}",
+      );
+      loggy.info(
+        "core generated config [$phase] dns rules: "
+        "${_summarizeConfigEntries(dns is Map ? dns["rules"] : null, ["server", "domain", "domain_suffix", "rule_set", "strategy", "rewrite_ttl"])}",
+      );
+      loggy.info(
+        "core generated config [$phase] route: "
+        "${_summarizeConfigMap(route, ["final", "auto_detect_interface", "default_domain_resolver", "rule_set"])}",
+      );
+      loggy.info(
+        "core generated config [$phase] custom: "
+        "${_summarizeConfigMap(decoded["custom"], ["hiddify-route-direct-connection-limit", "hiddify-route-proxy-connection-limit"])}",
+      );
+      loggy.info(
+        "core generated config [$phase] proxy groups: "
+        "${_summarizeProxyGroupOutbounds(decoded["outbounds"])}",
+      );
+    } catch (error, stackTrace) {
+      loggy.warning("core generated config [$phase]: failed to read diagnostics", error, stackTrace);
+    }
+  }
+
+  String _summarizeConfigEntries(dynamic entries, List<String> keys) {
+    if (entries is! List) return "[]";
+    final summary = entries
+        .whereType<Map>()
+        .map((entry) {
+          final normalized = entry.map((key, value) => MapEntry("$key", value));
+          return _summarizeConfigMap(normalized, keys);
+        })
+        .where((entry) => entry.isNotEmpty);
+    return summary.isEmpty ? "[]" : summary.join("; ");
+  }
+
+  String _summarizeConfigMap(dynamic value, List<String> keys) {
+    if (value is! Map) return "{}";
+    final normalized = value.map((key, mapValue) => MapEntry("$key", mapValue));
+    return keys
+        .where((key) => normalized.containsKey(key) && normalized[key] != null)
+        .map((key) => "$key=${_formatConfigValue(normalized[key])}")
+        .join(", ");
+  }
+
+  String _summarizeProxyGroupOutbounds(dynamic entries) {
+    if (entries is! List) return "[]";
+    final groupTags = {"select", "lowest", "balance"};
+    final summary = entries.whereType<Map>().where((entry) => groupTags.contains("${entry["tag"]}")).map((entry) {
+      final normalized = entry.map((key, value) => MapEntry("$key", value));
+      return _summarizeConfigMap(normalized, [
+        "tag",
+        "type",
+        "default",
+        "strategy",
+        "outbounds",
+        "tolerance",
+        "delay_acceptable_ratio",
+        "interrupt_exist_connections",
+      ]);
+    });
+    return summary.isEmpty ? "[]" : summary.join("; ");
+  }
+
+  String _formatConfigValue(dynamic value) {
+    if (value is List) {
+      const limit = 8;
+      final shown = value.take(limit).join(",");
+      final suffix = value.length > limit ? ",... len=${value.length}" : "";
+      return "[$shown$suffix]";
+    }
+    if (value is Map) return jsonEncode(value);
+    return "$value";
+  }
+
+  void _logActiveGroupDiagnostics(List<OutboundGroup> groups) {
+    final summary = groups
+        .map((group) {
+          final selectedItem = group.items.where((item) => item.tag == group.selected).firstOrNull;
+          final selectedDetail = selectedItem == null
+              ? ""
+              : ", selectedType=${selectedItem.type}, delay=${selectedItem.urlTestDelay}, real=${selectedItem.groupSelectedTag}";
+          return "tag=${group.tag}, type=${group.type}, selected=${group.selected}, items=${group.items.length}$selectedDetail";
+        })
+        .join("; ");
+    if (summary == _lastActiveGroupDiagnostics) return;
+    _lastActiveGroupDiagnostics = summary;
+    loggy.info("active proxy groups: ${summary.isEmpty ? "[]" : summary}");
+  }
 
   Future<void> init() async {
     await setup()
@@ -115,6 +264,7 @@ class HiddifyCoreService with InfraLogger {
   TaskEither<String, Unit> changeOptions(SingboxConfigOption options) {
     return TaskEither(() async {
       loggy.debug("changing options");
+      _logConfigOptionDiagnostics(options);
       // latestOptions = options;
       try {
         final res = await core.fgClient.changeHiddifySettings(
@@ -168,6 +318,7 @@ class HiddifyCoreService with InfraLogger {
           ),
         );
         ref.read(coreRestartSignalProvider.notifier).restart();
+        await _logGeneratedConfigDiagnostics("start response ${res.messageType.name}");
         if (res.messageType != MessageType.ALREADY_STARTED && res.messageType != MessageType.EMPTY) {
           final alert = res.message.contains("denied") ? CoreAlert.requestVPNPermission : CoreAlert.startFailed;
           currentState = CoreStatus.stopped(
@@ -182,8 +333,10 @@ class HiddifyCoreService with InfraLogger {
                 ConnectionFailure.unexpected("failed to start core ${res.messageType} ${res.message}"),
           );
         }
+        await _triggerActiveUrlTest("start");
       } on GrpcError catch (e) {
         loggy.error("failed to start bg core: $e");
+        await _logGeneratedConfigDiagnostics("start grpc error");
         ref.read(coreRestartSignalProvider.notifier).restart();
         if (e.code == StatusCode.unavailable) {
           return left(const ConnectionFailure.unexpected("background core is not started yet!"));
@@ -206,7 +359,7 @@ class HiddifyCoreService with InfraLogger {
       loggy.debug("stopping");
       var errMsg = "";
       try {
-        final res = await core.bgClient.stop(Empty());
+        await core.bgClient.stop(Empty());
       } on GrpcError catch (e) {
         if (e.code == StatusCode.unknown && !(e.message?.contains("HTTP/2") ?? false)) {
           errMsg = e.message ?? "failed to stop core: $e";
@@ -232,9 +385,12 @@ class HiddifyCoreService with InfraLogger {
         final res = await core.bgClient.restart(
           StartRequest(configPath: path, configName: name, disableMemoryLimit: disableMemoryLimit, delayStart: true),
         );
+        await _logGeneratedConfigDiagnostics("restart response ${res.messageType.name}");
         if (res.messageType != MessageType.EMPTY) return left("${res.messageType} ${res.message}");
+        await _triggerActiveUrlTest("restart");
       } on GrpcError catch (e) {
         loggy.error("failed to restart bg core: $e");
+        await _logGeneratedConfigDiagnostics("restart grpc error");
         if (e.code == StatusCode.unknown && !(e.message?.contains("HTTP/2 error") ?? false)) {
           return left("${e.message}");
         }
@@ -306,7 +462,9 @@ class HiddifyCoreService with InfraLogger {
       yield* core.bgClient
           .mainOutboundsInfo(Empty())
           .map((event) {
-            return latest = event.items;
+            latest = event.items;
+            _logActiveGroupDiagnostics(latest);
+            return latest;
           })
           .startWith(latest);
     } catch (e) {
@@ -441,25 +599,22 @@ class HiddifyCoreService with InfraLogger {
   Future<void> startListeningStatus(String key, CoreClient cc) async {
     await listenSingle<CoreStatus>(
       "${key}StatusListener",
-      () => cc
-          .coreInfoListener(Empty(), options: grpcOptions)
-          .doOnCancel(() {
-            loggy.error("status", "Canceld");
-            if (currentState == const CoreStatus.started()) currentState = const CoreStatus.stopped();
-          })
-          .doOnData((event) {
-            loggy.debug("status", event);
-            if (currentState == const CoreStatus.started()) currentState = const CoreStatus.stopped();
-          })
-          .doOnDone(() {
-            loggy.error("status", "done");
-            if (currentState == const CoreStatus.started()) currentState = const CoreStatus.stopped();
-          })
-          .endWith(CoreInfoResponse(coreState: CoreStates.STOPPED))
-          .map((event) {
-            currentState = CoreStatus.fromCoreInfo(event);
+      () =>
+          coreStatusListenerStream(
+            cc
+                .coreInfoListener(Empty(), options: grpcOptions)
+                .doOnCancel(() {
+                  loggy.warning("status listener [$key] canceled");
+                })
+                .doOnData((event) {
+                  loggy.debug("status", event);
+                })
+                .doOnDone(() {
+                  loggy.warning("status listener [$key] done");
+                }),
+          ).doOnData((event) {
+            currentState = event;
             statusController.add(currentState);
-            return currentState;
           }),
       // .endWith(const CoreStatus.stopped())
       onError: (error) {
@@ -556,7 +711,6 @@ class HiddifyCoreService with InfraLogger {
       config_log_level.LogLevel.error => LogLevel.ERROR,
       config_log_level.LogLevel.fatal => LogLevel.FATAL,
       config_log_level.LogLevel.panic => LogLevel.FATAL,
-      _ => LogLevel.INFO, // Default case
     };
   }
 
@@ -569,10 +723,18 @@ class HiddifyCoreService with InfraLogger {
       await stopListenSingle("bg");
       try {
         await core.fgClient.close(CloseRequest(mode: SetupMode.GRPC_NORMAL_INSECURE));
-      } catch (e) {}
+      } catch (e) {
+        // The foreground channel may already be closed during shutdown.
+      }
       try {
         await core.fgClient.close(CloseRequest(mode: SetupMode.GRPC_NORMAL));
-      } catch (e) {}
+      } catch (e) {
+        // Retry the alternate close mode without failing app shutdown.
+      }
     }
   }
+}
+
+Stream<CoreStatus> coreStatusListenerStream(Stream<CoreInfoResponse> events) {
+  return events.map(CoreStatus.fromCoreInfo);
 }
