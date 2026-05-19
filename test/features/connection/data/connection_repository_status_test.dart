@@ -111,6 +111,17 @@ void main() {
       expect(statuses, [const Checking()]);
     });
 
+    test("uses the first active group snapshot without a synthetic checking state", () async {
+      final statuses = await connectionStatusUpdatesFromCore(
+        Stream.value(const CoreStatus.started()),
+        () => Stream.value([
+          _group("select", selected: "node-a", items: [_info("node-a", delay: 176)]),
+        ]),
+      ).toList();
+
+      expect(statuses, [const Connected()]);
+    });
+
     test("suppresses duplicate started status replays", () async {
       final statuses = await connectionStatusUpdatesFromCore(
         Stream.fromIterable([const CoreStatus.started(), const CoreStatus.started()]),
@@ -119,7 +130,7 @@ void main() {
         ]),
       ).toList();
 
-      expect(statuses, [const Checking(), const Connected()]);
+      expect(statuses, [const Connected()]);
     });
   });
 }

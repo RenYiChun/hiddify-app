@@ -145,7 +145,6 @@ Stream<ConnectionStatus> connectionStatusUpdatesFromCore(
   return statusEvents.distinct().switchMap((event) {
     if (event case CoreStarted()) {
       return watchActiveGroups()
-          .startWith(const [])
           .map((groups) => connectionStatusFromCore(event, activeGroups: groups))
           .onErrorReturn(const Checking());
     }

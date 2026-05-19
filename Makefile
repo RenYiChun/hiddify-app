@@ -63,6 +63,9 @@ endif
 
 BUILD_ARGS=--dart-define sentry_dsn=$(SENTRY_DSN)
 DISTRIBUTOR_ARGS=--skip-clean --build-target $(TARGET) --build-dart-define sentry_dsn=$(SENTRY_DSN)
+FASTFORGE ?= fastforge --no-version-check
+CURL ?= curl
+CURL_DOWNLOAD = $(CURL) -fL --retry 5 --retry-delay 3 --retry-all-errors --connect-timeout 30
 
 
 
@@ -257,7 +260,23 @@ linux-flutter-sync:
 
 windows-install-deps:
 	dart pub global activate fastforge
-# 	choco install innosetup -y
+	choco install innosetup -y --no-progress
+
+windows-check-inno:
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Get-Command ISCC.exe -ErrorAction SilentlyContinue) -and -not (Get-Command iscc -ErrorAction SilentlyContinue)) { Write-Error 'Inno Setup 6 was not found. Run: make windows-install-deps'; exit 1 }"
+
+windows-check-msix-cert:
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "if (-not (Test-Path 'windows\sign.pfx')) { Write-Error 'MSIX signing certificate not found: windows\sign.pfx. For a local test certificate, run: make windows-create-test-certificate'; exit 1 }"
+
+windows-create-test-certificate:
+	powershell -NoProfile -ExecutionPolicy Bypass -Command "\
+		$$ErrorActionPreference = 'Stop'; \
+		$$subject = 'CN=8CB43675-F44B-4AA5-9372-E8727781BDC4'; \
+		$$password = ConvertTo-SecureString -String '1234' -Force -AsPlainText; \
+		$$cert = New-SelfSignedCertificate -Type CodeSigningCert -Subject $$subject -CertStoreLocation 'Cert:\CurrentUser\My' -KeyExportPolicy Exportable -KeyUsage DigitalSignature -KeyAlgorithm RSA -KeyLength 2048 -HashAlgorithm SHA256 -NotAfter (Get-Date).AddYears(5); \
+		Export-PfxCertificate -Cert $$cert -FilePath 'windows\sign.pfx' -Password $$password | Out-Null; \
+		Export-Certificate -Cert $$cert -FilePath 'windows\sign.cer' | Out-Null; \
+		Write-Host 'Generated windows\sign.pfx and windows\sign.cer. The local test certificate password is 1234.'"
 	
 gen_translations: #generating missing translations using google translate
 	cd .github && bash sync_translate.sh
@@ -266,7 +285,7 @@ gen_translations: #generating missing translations using google translate
 android-release: android-apk-release android-aab-release
 
 android-apk-release:
-	fastforge package \
+	$(FASTFORGE) package \
 	  --platform android \
 	  --targets apk \
 	  --skip-clean \
@@ -276,7 +295,7 @@ android-apk-release:
 	ls -R build/app/outputs
 
 android-aab-release:
-	fastforge package \
+	$(FASTFORGE) package \
 	  --platform android \
 	  --targets aab \
 	  --skip-clean \
@@ -287,7 +306,7 @@ android-aab-release:
 windows-release: windows-zip-release windows-exe-release windows-msix-release
 
 windows-zip-release:
-	fastforge package \
+	$(FASTFORGE) package \
 	  --platform windows \
 	  --targets zip \
 	  --skip-clean \
@@ -308,16 +327,16 @@ windows-zip-release:
 	rm -rf Hiddify; \
 	$(GREEN)Successful$(DONE)
 
-windows-exe-release:
-	fastforge package \
+windows-exe-release: windows-check-inno
+	$(FASTFORGE) package \
 	  --platform windows \
 	  --targets exe \
 	  --skip-clean \
 	  --build-target=$(TARGET) \
 	  --build-dart-define=sentry_dsn=$(SENTRY_DSN)
 
-windows-msix-release:
-	fastforge package \
+windows-msix-release: windows-check-msix-cert
+	$(FASTFORGE) package \
 	  --platform windows \
 	  --targets msix \
 	  --skip-clean \
@@ -333,7 +352,7 @@ linux-arm64-musl-release: linux-release
 
 
 linux-deb-release:
-	fastforge package \
+	$(FASTFORGE) package \
 	--platform linux \
 	--targets deb \
 	--skip-clean \
@@ -371,7 +390,7 @@ linux-deb-release:
 # runtime instability. Use only for specific edge cases where standard linking fails.
 # ==============================================================================
 linux-appimage-release:
-	fastforge package \
+	$(FASTFORGE) package \
 	--platform linux \
 	--targets appimage \
 	--skip-clean \
@@ -462,49 +481,65 @@ linux-docker-release:
 	@$(GREEN)Successful. Output is in 'dist_docker' folder.$(DONE)
 
 macos-release:
-	fastforge package --platform macos --targets dmg,pkg $(DISTRIBUTOR_ARGS)
+	$(FASTFORGE) package --platform macos --targets dmg,pkg $(DISTRIBUTOR_ARGS)
 
 ios-release: #not tested
-	fastforge package --platform ios --targets ipa --build-export-options-plist  ios/exportOptions.plist $(DISTRIBUTOR_ARGS)
+	$(FASTFORGE) package --platform ios --targets ipa --build-export-options-plist  ios/exportOptions.plist $(DISTRIBUTOR_ARGS)
 
 android-libs:
 	$(MKDIR) $(ANDROID_OUT) || echo Folder already exists. Skipping...
-	curl -L $(CORE_URL)/$(CORE_NAME)-android.tar.gz | tar xz -C $(ANDROID_OUT)/
+	$(CURL_DOWNLOAD) -o $(ANDROID_OUT)/$(CORE_NAME)-android.tar.gz $(CORE_URL)/$(CORE_NAME)-android.tar.gz
+	tar xzf $(ANDROID_OUT)/$(CORE_NAME)-android.tar.gz -C $(ANDROID_OUT)/
+	rm -f $(ANDROID_OUT)/$(CORE_NAME)-android.tar.gz
 
 android-apk-libs: android-libs
 android-aab-libs: android-libs
 
 windows-libs:
 	$(MKDIR) $(DESKTOP_OUT) || echo Folder already exists. Skipping...
-	curl -L $(CORE_URL)/$(CORE_NAME)-windows-amd64.tar.gz | tar xz -C $(DESKTOP_OUT)/
+	$(CURL_DOWNLOAD) -o $(DESKTOP_OUT)/$(CORE_NAME)-windows-amd64.tar.gz $(CORE_URL)/$(CORE_NAME)-windows-amd64.tar.gz
+	tar xzf $(DESKTOP_OUT)/$(CORE_NAME)-windows-amd64.tar.gz -C $(DESKTOP_OUT)/
+	rm -f $(DESKTOP_OUT)/$(CORE_NAME)-windows-amd64.tar.gz
 	ls $(DESKTOP_OUT) || dir $(DESKTOP_OUT)/
 	
 
 linux-amd64-libs:
 	mkdir -p $(DESKTOP_OUT)
-	curl -L $(CORE_URL)/$(CORE_NAME)-linux-amd64.tar.gz | tar xz -C $(DESKTOP_OUT)/
+	$(CURL_DOWNLOAD) -o $(DESKTOP_OUT)/$(CORE_NAME)-linux-amd64.tar.gz $(CORE_URL)/$(CORE_NAME)-linux-amd64.tar.gz
+	tar xzf $(DESKTOP_OUT)/$(CORE_NAME)-linux-amd64.tar.gz -C $(DESKTOP_OUT)/
+	rm -f $(DESKTOP_OUT)/$(CORE_NAME)-linux-amd64.tar.gz
 
 linux-arm64-libs:
 	mkdir -p $(DESKTOP_OUT)
-	curl -L $(CORE_URL)/$(CORE_NAME)-linux-arm64.tar.gz | tar xz -C $(DESKTOP_OUT)/
+	$(CURL_DOWNLOAD) -o $(DESKTOP_OUT)/$(CORE_NAME)-linux-arm64.tar.gz $(CORE_URL)/$(CORE_NAME)-linux-arm64.tar.gz
+	tar xzf $(DESKTOP_OUT)/$(CORE_NAME)-linux-arm64.tar.gz -C $(DESKTOP_OUT)/
+	rm -f $(DESKTOP_OUT)/$(CORE_NAME)-linux-arm64.tar.gz
 
 linux-amd64-musl-libs:
 	mkdir -p $(DESKTOP_OUT)
-	curl -L $(CORE_URL)/$(CORE_NAME)-linux-amd64-musl.tar.gz | tar xz -C $(DESKTOP_OUT)/
+	$(CURL_DOWNLOAD) -o $(DESKTOP_OUT)/$(CORE_NAME)-linux-amd64-musl.tar.gz $(CORE_URL)/$(CORE_NAME)-linux-amd64-musl.tar.gz
+	tar xzf $(DESKTOP_OUT)/$(CORE_NAME)-linux-amd64-musl.tar.gz -C $(DESKTOP_OUT)/
+	rm -f $(DESKTOP_OUT)/$(CORE_NAME)-linux-amd64-musl.tar.gz
 
 linux-arm64-musl-libs:
 	mkdir -p $(DESKTOP_OUT)
-	curl -L $(CORE_URL)/$(CORE_NAME)-linux-arm64-musl.tar.gz | tar xz -C $(DESKTOP_OUT)/
+	$(CURL_DOWNLOAD) -o $(DESKTOP_OUT)/$(CORE_NAME)-linux-arm64-musl.tar.gz $(CORE_URL)/$(CORE_NAME)-linux-arm64-musl.tar.gz
+	tar xzf $(DESKTOP_OUT)/$(CORE_NAME)-linux-arm64-musl.tar.gz -C $(DESKTOP_OUT)/
+	rm -f $(DESKTOP_OUT)/$(CORE_NAME)-linux-arm64-musl.tar.gz
 
 
 macos-libs:
 	mkdir -p  $(DESKTOP_OUT) 
-	curl -L $(CORE_URL)/$(CORE_NAME)-macos.tar.gz | tar xz -C $(DESKTOP_OUT)
+	$(CURL_DOWNLOAD) -o $(DESKTOP_OUT)/$(CORE_NAME)-macos.tar.gz $(CORE_URL)/$(CORE_NAME)-macos.tar.gz
+	tar xzf $(DESKTOP_OUT)/$(CORE_NAME)-macos.tar.gz -C $(DESKTOP_OUT)
+	rm -f $(DESKTOP_OUT)/$(CORE_NAME)-macos.tar.gz
 
 ios-libs: #not tested
 	mkdir -p $(IOS_OUT)
 	rm -rf $(IOS_OUT)/HiddifyCore.xcframework
-	curl -L $(CORE_URL)/$(CORE_NAME)-ios.tar.gz | tar xz -C "$(IOS_OUT)"
+	$(CURL_DOWNLOAD) -o $(IOS_OUT)/$(CORE_NAME)-ios.tar.gz $(CORE_URL)/$(CORE_NAME)-ios.tar.gz
+	tar xzf $(IOS_OUT)/$(CORE_NAME)-ios.tar.gz -C "$(IOS_OUT)"
+	rm -f $(IOS_OUT)/$(CORE_NAME)-ios.tar.gz
 
 get-geo-assets:
 	echo ""
