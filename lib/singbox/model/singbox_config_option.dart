@@ -47,7 +47,6 @@ class SingboxConfigOption with _$SingboxConfigOption {
     required int directRouteConnectionLimit,
     required int proxyRouteConnectionLimit,
     required bool enableDynamicDirectBypass,
-    required int dynamicDirectBypassThreshold,
     @IntervalInSecondsConverter() required Duration dynamicDirectBypassTtl,
     required int dynamicDirectBypassMaxRoutes,
     required int dynamicDirectBypassMaxRoutesPerHost,

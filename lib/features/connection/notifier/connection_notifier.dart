@@ -82,8 +82,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
           await haptic.lightImpact();
           await ref.read(Preferences.startedByUser.notifier).update(true);
           await _connect();
-        case Connected():
-          // default:
+        case Connected() || Checking() || OutboundUnavailable() || CurrentOutboundUnavailable():
           await haptic.mediumImpact();
           await ref.read(Preferences.startedByUser.notifier).update(false);
           await _disconnect();
@@ -94,7 +93,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   }
 
   Future<void> reconnect(ProfileEntity? profile) async {
-    if (state case AsyncData(:final value) when value == const Connected()) {
+    if (state case AsyncData(:final value) when value.isConnected) {
       if (profile == null) {
         loggy.info("no active profile, disconnecting");
         return _disconnect();
@@ -118,7 +117,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   Future<void> abortConnection() async {
     if (state case AsyncData(:final value)) {
       switch (value) {
-        case Connected() || Connecting():
+        case Connected() || Checking() || OutboundUnavailable() || CurrentOutboundUnavailable() || Connecting():
           loggy.debug("aborting connection");
           await _disconnect();
         default:

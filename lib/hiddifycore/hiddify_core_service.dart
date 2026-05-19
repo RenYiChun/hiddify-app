@@ -74,7 +74,7 @@ class HiddifyCoreService with InfraLogger {
       "directRouteConnectionLimit=${options.directRouteConnectionLimit}, "
       "proxyRouteConnectionLimit=${options.proxyRouteConnectionLimit}, "
       "dynamicDirectBypass=${options.enableDynamicDirectBypass}, "
-      "dynamicDirectBypassThreshold=${options.dynamicDirectBypassThreshold}, "
+      "dynamicDirectBypassMode=all-direct, "
       "dynamicDirectBypassTtl=${options.dynamicDirectBypassTtl.inSeconds}s, "
       "dynamicDirectBypassMaxRoutes=${options.dynamicDirectBypassMaxRoutes}, "
       "dynamicDirectBypassMaxRoutesPerHost=${options.dynamicDirectBypassMaxRoutesPerHost}, "
@@ -120,7 +120,7 @@ class HiddifyCoreService with InfraLogger {
       );
       loggy.info(
         "core generated config [$phase] custom: "
-        "${_summarizeConfigMap(decoded["custom"], ["hiddify-route-direct-connection-limit", "hiddify-route-proxy-connection-limit", "hiddify-dynamic-direct-bypass-enabled", "hiddify-dynamic-direct-bypass-threshold", "hiddify-dynamic-direct-bypass-ttl", "hiddify-dynamic-direct-bypass-max-routes", "hiddify-dynamic-direct-bypass-max-routes-per-host"])}",
+        "${_summarizeConfigMap(decoded["custom"], ["hiddify-route-direct-connection-limit", "hiddify-route-proxy-connection-limit", "hiddify-dynamic-direct-bypass-enabled", "hiddify-dynamic-direct-bypass-ttl", "hiddify-dynamic-direct-bypass-max-routes", "hiddify-dynamic-direct-bypass-max-routes-per-host"])}",
       );
       loggy.info(
         "core generated config [$phase] proxy groups: "

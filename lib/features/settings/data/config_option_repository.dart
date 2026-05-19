@@ -186,22 +186,16 @@ abstract class ConfigOptions {
 
   static final enableDynamicDirectBypass = PreferencesNotifier.create<bool, bool>("enable-dynamic-direct-bypass", true);
 
-  static final dynamicDirectBypassThreshold = PreferencesNotifier.create<int, int>(
-    "dynamic-direct-bypass-threshold",
-    64,
-    validator: (value) => value > 0,
-  );
-
   static final dynamicDirectBypassTtl = PreferencesNotifier.create<Duration, int>(
     "dynamic-direct-bypass-ttl",
-    const Duration(minutes: 30),
+    const Duration(hours: 24),
     mapFrom: const IntervalInSecondsConverter().fromJson,
     mapTo: const IntervalInSecondsConverter().toJson,
   );
 
   static final dynamicDirectBypassMaxRoutes = PreferencesNotifier.create<int, int>(
     "dynamic-direct-bypass-max-routes",
-    512,
+    2048,
     validator: (value) => value > 0,
   );
 
@@ -369,7 +363,6 @@ abstract class ConfigOptions {
     "direct-route-connection-limit": directRouteConnectionLimit,
     "proxy-route-connection-limit": proxyRouteConnectionLimit,
     "enable-dynamic-direct-bypass": enableDynamicDirectBypass,
-    "dynamic-direct-bypass-threshold": dynamicDirectBypassThreshold,
     "dynamic-direct-bypass-ttl": dynamicDirectBypassTtl,
     "dynamic-direct-bypass-max-routes": dynamicDirectBypassMaxRoutes,
     "dynamic-direct-bypass-max-routes-per-host": dynamicDirectBypassMaxRoutesPerHost,
@@ -486,7 +479,6 @@ abstract class ConfigOptions {
       directRouteConnectionLimit: ref.watch(directRouteConnectionLimit),
       proxyRouteConnectionLimit: ref.watch(proxyRouteConnectionLimit),
       enableDynamicDirectBypass: ref.watch(enableDynamicDirectBypass),
-      dynamicDirectBypassThreshold: ref.watch(dynamicDirectBypassThreshold),
       dynamicDirectBypassTtl: ref.watch(dynamicDirectBypassTtl),
       dynamicDirectBypassMaxRoutes: ref.watch(dynamicDirectBypassMaxRoutes),
       dynamicDirectBypassMaxRoutesPerHost: ref.watch(dynamicDirectBypassMaxRoutesPerHost),

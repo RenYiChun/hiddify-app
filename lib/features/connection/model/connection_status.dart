@@ -11,10 +11,13 @@ sealed class ConnectionStatus with _$ConnectionStatus {
   const factory ConnectionStatus.disconnected([ConnectionFailure? connectionFailure]) = Disconnected;
   const factory ConnectionStatus.connecting() = Connecting;
   const factory ConnectionStatus.connected() = Connected;
+  const factory ConnectionStatus.checking() = Checking;
+  const factory ConnectionStatus.outboundUnavailable() = OutboundUnavailable;
+  const factory ConnectionStatus.currentOutboundUnavailable() = CurrentOutboundUnavailable;
   const factory ConnectionStatus.disconnecting() = Disconnecting;
 
   bool get isConnected => switch (this) {
-    Connected() => true,
+    Connected() || Checking() || OutboundUnavailable() || CurrentOutboundUnavailable() => true,
     _ => false,
   };
 
@@ -29,16 +32,16 @@ sealed class ConnectionStatus with _$ConnectionStatus {
     _ => false,
   };
 
-  ConnectionStatus withConnectivityDelay(int urlTestDelay) => switch (this) {
-    Connected() when urlTestDelay <= 0 || urlTestDelay >= 65000 => const Connecting(),
-    _ => this,
-  };
+  ConnectionStatus withConnectivityDelay(int urlTestDelay) => this;
 
   String format() => switch (this) {
     Disconnected(:final connectionFailure) =>
       connectionFailure != null ? "CONNECTION FAILURE: $connectionFailure" : "DISCONNECTED",
     Connecting() => "CONNECTING",
     Connected() => "CONNECTED",
+    Checking() => "STARTED CHECKING",
+    OutboundUnavailable() => "STARTED OUTBOUND UNAVAILABLE",
+    CurrentOutboundUnavailable() => "CONNECTED CURRENT OUTBOUND UNAVAILABLE",
     Disconnecting() => "DISCONNECTING",
   };
 
@@ -46,6 +49,9 @@ sealed class ConnectionStatus with _$ConnectionStatus {
     Disconnected() => t.connection.tapToConnect,
     Connecting() => t.connection.connecting,
     Connected() => t.connection.connected,
+    Checking() => t.connection.checking,
+    OutboundUnavailable() => t.connection.outboundUnavailable,
+    CurrentOutboundUnavailable() => t.connection.currentOutboundUnavailable,
     Disconnecting() => t.connection.disconnecting,
   };
 }

@@ -17,6 +17,7 @@ class PreferencesMigration with InfraLogger {
       PreferencesVersion3Migration(sharedPreferences),
       PreferencesVersion4Migration(sharedPreferences),
       PreferencesVersion5Migration(sharedPreferences),
+      PreferencesVersion6Migration(sharedPreferences),
     ];
 
     if (currentVersion == migrationSteps.length) {
@@ -96,6 +97,8 @@ class PreferencesVersion4Migration extends PreferencesMigrationStep with InfraLo
 
 const _directRouteConnectionLimitKey = "direct-route-connection-limit";
 const _proxyRouteConnectionLimitKey = "proxy-route-connection-limit";
+const _dynamicDirectBypassTtlKey = "dynamic-direct-bypass-ttl";
+const _dynamicDirectBypassMaxRoutesKey = "dynamic-direct-bypass-max-routes";
 
 class PreferencesVersion5Migration extends PreferencesMigrationStep with InfraLogger {
   PreferencesVersion5Migration(super.sharedPreferences);
@@ -109,6 +112,22 @@ class PreferencesVersion5Migration extends PreferencesMigrationStep with InfraLo
     if (sharedPreferences.getInt(_proxyRouteConnectionLimitKey) case 128) {
       loggy.debug("changing proxy route connection limit from [128] to [256]");
       await sharedPreferences.setInt(_proxyRouteConnectionLimitKey, 256);
+    }
+  }
+}
+
+class PreferencesVersion6Migration extends PreferencesMigrationStep with InfraLogger {
+  PreferencesVersion6Migration(super.sharedPreferences);
+
+  @override
+  Future<void> migrate() async {
+    if (sharedPreferences.getInt(_dynamicDirectBypassTtlKey) case 1800) {
+      loggy.debug("changing dynamic direct bypass ttl from [1800] to [86400]");
+      await sharedPreferences.setInt(_dynamicDirectBypassTtlKey, 86400);
+    }
+    if (sharedPreferences.getInt(_dynamicDirectBypassMaxRoutesKey) case 512) {
+      loggy.debug("changing dynamic direct bypass max routes from [512] to [2048]");
+      await sharedPreferences.setInt(_dynamicDirectBypassMaxRoutesKey, 2048);
     }
   }
 }

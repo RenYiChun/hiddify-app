@@ -2,6 +2,7 @@ import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/model/directories.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
+import 'package:hiddify/features/connection/data/windows_port_reservation_service.dart';
 import 'package:hiddify/features/connection/model/connection_failure.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/profile/data/profile_path_resolver.dart';
@@ -35,6 +36,7 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
     required this.singbox,
     required this.configOptionRepository,
     required this.profilePathResolver,
+    required this.windowsPortReservationService,
   });
 
   final Ref ref;
@@ -44,6 +46,7 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
 
   final ConfigOptionRepository configOptionRepository;
   final ProfilePathResolver profilePathResolver;
+  final WindowsPortReservationService windowsPortReservationService;
 
   SingboxConfigOption? _configOptionsSnapshot;
   @override
@@ -110,6 +113,12 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
                   throw const MissingWarpLicense();
                 }
               }
+              if (runtimeOptions.enableTun) {
+                final portsReserved = await windowsPortReservationService.ensureReserved();
+                if (!portsReserved) {
+                  loggy.warning("Windows Hiddify port reservations could not be verified before VPN start");
+                }
+              }
               _configOptionsSnapshot = runtimeOptions;
               await singbox.changeOptions(runtimeOptions).run();
               return unit;
@@ -133,11 +142,12 @@ Stream<ConnectionStatus> connectionStatusUpdatesFromCore(
   Stream<CoreStatus> statusEvents,
   Stream<List<OutboundGroup>> Function() watchActiveGroups,
 ) {
-  return statusEvents.switchMap((event) {
+  return statusEvents.distinct().switchMap((event) {
     if (event case CoreStarted()) {
       return watchActiveGroups()
+          .startWith(const [])
           .map((groups) => connectionStatusFromCore(event, activeGroups: groups))
-          .onErrorReturn(const Connecting());
+          .onErrorReturn(const Checking());
     }
     return Stream.value(connectionStatusFromCore(event));
   }).distinct();
@@ -148,35 +158,73 @@ ConnectionStatus connectionStatusFromCore(CoreStatus event, {List<OutboundGroup>
   return switch (event) {
     CoreStopped() => Disconnected(event.getCoreAlert()),
     CoreStarting() => const Connecting(),
-    CoreStarted() => _hasValidActiveProxy(activeGroups) ? const Connected() : const Connecting(),
+    CoreStarted() => _connectionStatusFromActiveGroups(activeGroups),
     CoreStopping() => const Disconnecting(),
   };
 }
 
-bool _hasValidActiveProxy(List<OutboundGroup> groups) {
-  if (groups.isEmpty) return false;
+ConnectionStatus _connectionStatusFromActiveGroups(List<OutboundGroup> groups) {
+  if (groups.isEmpty) return const Checking();
 
   final groupsByTag = <String, OutboundGroup>{
     for (final group in groups)
       if (group.tag.isNotEmpty) group.tag: group,
   };
 
-  var group = groupsByTag["select"] ?? groups.first;
+  final rootGroup = groupsByTag["select"] ?? groups.first;
+  final selectedRootItem = _selectedItem(rootGroup);
+  final observedLeaves = _observedLeafItems(groups).toList();
+  if (selectedRootItem == null || observedLeaves.isEmpty) return const Checking();
+
+  final hasSuccessfulLeaf = observedLeaves.any(_hasSuccessfulDelay);
+  if (_isAutoSelectionMode(selectedRootItem)) {
+    if (hasSuccessfulLeaf) return const Connected();
+
+    final hasFailedLeaf = observedLeaves.any(_hasFailedDelay);
+    final hasUnknownLeaf = observedLeaves.any(_hasUnknownDelay);
+    if (hasFailedLeaf && !hasUnknownLeaf) return const OutboundUnavailable();
+
+    return const Checking();
+  }
+
+  final selectedLeaf = selectedRootItem.isGroup ? _selectedLeaf(selectedRootItem.tag, groupsByTag) : selectedRootItem;
+  if (selectedLeaf == null || _hasUnknownDelay(selectedLeaf)) return const Checking();
+  if (_hasSuccessfulDelay(selectedLeaf)) return const Connected();
+  if (hasSuccessfulLeaf) return const CurrentOutboundUnavailable();
+  if (_hasFailedDelay(selectedLeaf)) return const OutboundUnavailable();
+
+  return const Checking();
+}
+
+bool _isAutoSelectionMode(OutboundInfo selectedRootItem) {
+  return selectedRootItem.isGroup && (selectedRootItem.tag == "balance" || selectedRootItem.tag == "lowest");
+}
+
+OutboundInfo? _selectedLeaf(String groupTag, Map<String, OutboundGroup> groupsByTag) {
+  var group = groupsByTag[groupTag];
+  if (group == null) return null;
   final visited = <String>{};
 
-  while (visited.add(group.tag)) {
+  while (visited.add(group!.tag)) {
     final selectedItem = _selectedItem(group);
-    if (selectedItem == null) return false;
+    if (selectedItem == null) return null;
 
-    if (_hasSuccessfulDelay(selectedItem)) return true;
-    if (!selectedItem.isGroup) return false;
+    if (!selectedItem.isGroup) return selectedItem;
 
     final nestedGroup = groupsByTag[selectedItem.tag];
-    if (nestedGroup == null) return false;
+    if (nestedGroup == null) return null;
     group = nestedGroup;
   }
 
-  return false;
+  return null;
+}
+
+Iterable<OutboundInfo> _observedLeafItems(List<OutboundGroup> groups) sync* {
+  for (final group in groups) {
+    for (final item in group.items) {
+      if (!item.isGroup) yield item;
+    }
+  }
 }
 
 OutboundInfo? _selectedItem(OutboundGroup group) {
@@ -192,5 +240,13 @@ OutboundInfo? _selectedItem(OutboundGroup group) {
 bool _hasSuccessfulDelay(OutboundInfo info) {
   final delay = info.urlTestDelay;
   if (delay <= 0 || delay >= 65000) return false;
-  return !info.isGroup || info.groupSelectedTag.isNotEmpty;
+  return true;
+}
+
+bool _hasFailedDelay(OutboundInfo info) {
+  return info.urlTestDelay >= 65000;
+}
+
+bool _hasUnknownDelay(OutboundInfo info) {
+  return info.urlTestDelay <= 0;
 }

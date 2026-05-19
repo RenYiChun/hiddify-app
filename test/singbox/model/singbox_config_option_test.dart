@@ -37,7 +37,6 @@ void main() {
       directRouteConnectionLimit: 512,
       proxyRouteConnectionLimit: 128,
       enableDynamicDirectBypass: true,
-      dynamicDirectBypassThreshold: 64,
       dynamicDirectBypassTtl: const Duration(minutes: 15),
       dynamicDirectBypassMaxRoutes: 128,
       dynamicDirectBypassMaxRoutesPerHost: 16,
@@ -60,14 +59,13 @@ void main() {
     expect(json["direct-route-connection-limit"], 512);
     expect(json["proxy-route-connection-limit"], 128);
     expect(json["enable-dynamic-direct-bypass"], true);
-    expect(json["dynamic-direct-bypass-threshold"], 64);
+    expect(json.containsKey("dynamic-direct-bypass-threshold"), false);
     expect(json["dynamic-direct-bypass-ttl"], 900);
     expect(json["dynamic-direct-bypass-max-routes"], 128);
     expect(json["dynamic-direct-bypass-max-routes-per-host"], 16);
     expect(SingboxConfigOption.fromJson(json).directRouteConnectionLimit, 512);
     expect(SingboxConfigOption.fromJson(json).proxyRouteConnectionLimit, 128);
     expect(SingboxConfigOption.fromJson(json).enableDynamicDirectBypass, true);
-    expect(SingboxConfigOption.fromJson(json).dynamicDirectBypassThreshold, 64);
     expect(SingboxConfigOption.fromJson(json).dynamicDirectBypassTtl, const Duration(minutes: 15));
     expect(SingboxConfigOption.fromJson(json).dynamicDirectBypassMaxRoutes, 128);
     expect(SingboxConfigOption.fromJson(json).dynamicDirectBypassMaxRoutesPerHost, 16);

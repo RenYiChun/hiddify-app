@@ -63,6 +63,9 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
           Disconnected() => t.connection.connect,
           Connecting() => t.connection.disconnect,
           Connected() => t.connection.disconnect,
+          Checking() => t.connection.disconnect,
+          OutboundUnavailable() => t.connection.disconnect,
+          CurrentOutboundUnavailable() => t.connection.disconnect,
           Disconnecting() => t.connection.disconnecting,
         },
         disabled: connection is Disconnecting,
@@ -89,8 +92,11 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
     final isWindows = PlatformUtils.isWindows;
     switch (status) {
       case Connected():
+      case CurrentOutboundUnavailable():
         return isWindows ? images.trayIconConnectedIco : images.trayIconConnectedPng.path;
       case Connecting():
+      case Checking():
+      case OutboundUnavailable():
       case Disconnecting():
         return isWindows ? images.trayIconDisconnectedIco : images.trayIconDisconnectedPng.path;
       case Disconnected():
@@ -106,7 +112,7 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
 
   String _trayTooltip(ConnectionStatus connection, int urlTestDelay, Translations t) {
     final r = "${Constants.appName} - ${connection.present(t)}";
-    if (connection is Connected) {
+    if (connection is Connected || connection is CurrentOutboundUnavailable) {
       if (Platform.isMacOS) windowManager.setBadgeLabel("${urlTestDelay}ms");
       return '$r : ${urlTestDelay}ms"';
     } else {

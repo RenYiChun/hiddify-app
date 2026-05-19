@@ -64,7 +64,7 @@ class _ActiveProxyFooterState extends ConsumerState<ActiveProxyFooter> with Infr
     final t = ref.watch(translationsProvider).requireValue;
 
     // Early return if required data is not available
-    if (connectionState != const Connected() || activeProxy == null) {
+    if (!connectionState.isConnected || activeProxy == null) {
       return const SizedBox.shrink();
     }
 

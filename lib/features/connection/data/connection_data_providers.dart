@@ -1,5 +1,6 @@
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/features/connection/data/connection_repository.dart';
+import 'package:hiddify/features/connection/data/windows_port_reservation_service.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/settings/data/config_option_data_providers.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
@@ -16,5 +17,6 @@ ConnectionRepository connectionRepository(Ref ref) {
     configOptionRepository: ref.watch(configOptionRepositoryProvider),
     singbox: ref.watch(hiddifyCoreServiceProvider),
     profilePathResolver: ref.watch(profilePathResolverProvider),
+    windowsPortReservationService: ref.watch(windowsPortReservationServiceProvider),
   );
 }

@@ -226,6 +226,38 @@ try {
       Format-Table -AutoSize
   }
 
+  Invoke-Capture "dynamic-port-range-tcp.txt" {
+    & netsh.exe int ipv4 show dynamicport tcp
+  }
+
+  Invoke-Capture "dynamic-port-range-udp.txt" {
+    & netsh.exe int ipv4 show dynamicport udp
+  }
+
+  Invoke-Capture "dynamic-port-range-ipv6-tcp.txt" {
+    & netsh.exe int ipv6 show dynamicport tcp
+  }
+
+  Invoke-Capture "dynamic-port-range-ipv6-udp.txt" {
+    & netsh.exe int ipv6 show dynamicport udp
+  }
+
+  Invoke-Capture "excluded-port-ranges-tcp.txt" {
+    & netsh.exe int ipv4 show excludedportrange protocol=tcp
+  }
+
+  Invoke-Capture "excluded-port-ranges-udp.txt" {
+    & netsh.exe int ipv4 show excludedportrange protocol=udp
+  }
+
+  Invoke-Capture "excluded-port-ranges-ipv6-tcp.txt" {
+    & netsh.exe int ipv6 show excludedportrange protocol=tcp
+  }
+
+  Invoke-Capture "excluded-port-ranges-ipv6-udp.txt" {
+    & netsh.exe int ipv6 show excludedportrange protocol=udp
+  }
+
   Invoke-Capture "system-proxy.txt" {
     Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings" |
       Select-Object ProxyEnable, ProxyServer, AutoConfigURL, AutoDetect |
