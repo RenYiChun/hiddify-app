@@ -140,13 +140,24 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
 @visibleForTesting
 Stream<ConnectionStatus> connectionStatusUpdatesFromCore(
   Stream<CoreStatus> statusEvents,
-  Stream<List<OutboundGroup>> Function() watchActiveGroups,
-) {
+  Stream<List<OutboundGroup>> Function() watchActiveGroups, {
+  Duration disconnectingRecoveryDelay = const Duration(seconds: 2),
+}) {
   return statusEvents.distinct().switchMap((event) {
     if (event case CoreStarted()) {
       return watchActiveGroups()
           .map((groups) => connectionStatusFromCore(event, activeGroups: groups))
           .onErrorReturn(const Checking());
+    }
+    if (event case CoreStopping()) {
+      return Stream<ConnectionStatus>.value(const Disconnecting()).concatWith([
+        Rx.timer(null, disconnectingRecoveryDelay)
+            .asyncExpand((_) => watchActiveGroups())
+            .map((groups) => connectionStatusFromCore(const CoreStatus.started(), activeGroups: groups))
+            .where((status) => status.isConnected)
+            .onErrorResumeNext(const Stream.empty())
+            .take(1),
+      ]);
     }
     return Stream.value(connectionStatusFromCore(event));
   }).distinct();

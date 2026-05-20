@@ -132,6 +132,18 @@ void main() {
 
       expect(statuses, [const Connected()]);
     });
+
+    test("recovers from stale stopping state when core is still serving active groups", () async {
+      final statuses = await connectionStatusUpdatesFromCore(
+        Stream.value(const CoreStatus.stopping()),
+        () => Stream.value([
+          _group("select", selected: "node-a", items: [_info("node-a", delay: 176)]),
+        ]),
+        disconnectingRecoveryDelay: Duration.zero,
+      ).take(2).toList();
+
+      expect(statuses, [const Disconnecting(), const Connected()]);
+    });
   });
 }
 
