@@ -44,26 +44,28 @@ class ConsolePrinter extends LoggyPrinter {
 }
 
 class FileLogPrinter extends LoggyPrinter {
-  FileLogPrinter(String filePath, {this.minLevel = LogLevel.debug}) : _logFile = File(filePath);
+  FileLogPrinter(String filePath, {this.minLevel = LogLevel.debug}) : _logFile = File(filePath) {
+    _logFile.parent.createSync(recursive: true);
+    _logFile.writeAsStringSync("");
+  }
 
   final File _logFile;
   final LogLevel minLevel;
 
-  late final _sink = _logFile.openWrite(mode: FileMode.writeOnly);
-
   @override
   void onLog(LogRecord record) {
+    if (record.level.priority < minLevel.priority) return;
+
     final time = record.time.toIso8601String().split('T')[1];
-    _sink.writeln("$time - $record");
+    final buffer = StringBuffer()..writeln("$time - $record");
     if (record.error != null) {
-      _sink.writeln(record.error);
+      buffer.writeln(record.error);
     }
     if (record.stackTrace != null) {
-      _sink.writeln(record.stackTrace);
+      buffer.writeln(record.stackTrace);
     }
+    _logFile.writeAsStringSync(buffer.toString(), mode: FileMode.append, flush: true);
   }
 
-  void dispose() {
-    _sink.close();
-  }
+  void dispose() {}
 }

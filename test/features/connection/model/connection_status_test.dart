@@ -18,17 +18,32 @@ void main() {
   });
 
   group("ConnectionStatus.isConnected", () {
-    test("treats all core-started health states as connected for control actions", () {
+    test("treats only verified connected state as connected", () {
       expect(const Connected().isConnected, isTrue);
-      expect(const Checking().isConnected, isTrue);
-      expect(const OutboundUnavailable().isConnected, isTrue);
-      expect(const CurrentOutboundUnavailable().isConnected, isTrue);
+      expect(const Checking().isConnected, isFalse);
+      expect(const OutboundUnavailable().isConnected, isFalse);
+      expect(const CurrentOutboundUnavailable().isConnected, isFalse);
     });
 
     test("keeps lifecycle transition states non-connected", () {
       expect(const Disconnected().isConnected, isFalse);
       expect(const Connecting().isConnected, isFalse);
       expect(const Disconnecting().isConnected, isFalse);
+    });
+  });
+
+  group("ConnectionStatus.isServiceRunning", () {
+    test("treats core-started health states as running for control actions", () {
+      expect(const Connected().isServiceRunning, isTrue);
+      expect(const Checking().isServiceRunning, isTrue);
+      expect(const OutboundUnavailable().isServiceRunning, isTrue);
+      expect(const CurrentOutboundUnavailable().isServiceRunning, isTrue);
+    });
+
+    test("keeps stopped and lifecycle transition states non-running", () {
+      expect(const Disconnected().isServiceRunning, isFalse);
+      expect(const Connecting().isServiceRunning, isFalse);
+      expect(const Disconnecting().isServiceRunning, isFalse);
     });
   });
 }

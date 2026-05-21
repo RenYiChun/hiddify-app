@@ -93,7 +93,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   }
 
   Future<void> reconnect(ProfileEntity? profile) async {
-    if (state case AsyncData(:final value) when value.isConnected) {
+    if (state case AsyncData(:final value) when value.isServiceRunning) {
       if (profile == null) {
         loggy.info("no active profile, disconnecting");
         return _disconnect();
@@ -181,7 +181,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
 Future<bool> serviceRunning(Ref ref) async {
   // ref.watch(coreRestartSignalProvider);
   return await ref
-      .watch(connectionNotifierProvider.selectAsync((data) => data.isConnected))
+      .watch(connectionNotifierProvider.selectAsync((data) => data.isServiceRunning))
       .onError((error, stackTrace) => false);
 }
 

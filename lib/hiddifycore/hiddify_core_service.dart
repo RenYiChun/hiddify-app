@@ -23,7 +23,15 @@ import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:loggy/loggy.dart' as loggyl;
+import 'package:meta/meta.dart';
 import 'package:rxdart/rxdart.dart';
+
+@visibleForTesting
+bool isRecoverableRestartGrpcDisconnect(GrpcError error) {
+  if (error.code != StatusCode.unknown) return false;
+  final message = error.message ?? "";
+  return message.contains("HTTP/2 error") && message.contains("Connection is being forcefully terminated");
+}
 
 class HiddifyCoreService with InfraLogger {
   HiddifyCoreService(this.ref);
@@ -34,6 +42,8 @@ class HiddifyCoreService with InfraLogger {
 
   CoreStatus currentState = const CoreStatus.stopped();
   final statusController = BehaviorSubject<CoreStatus>();
+  bool _stopInProgress = false;
+  bool get isStopInProgress => _stopInProgress;
   final logController = BehaviorSubject<List<LogMessage>>.seeded(const <LogMessage>[]);
   final CallOptions? grpcOptions = null; //CallOptions(timeout: const Duration(milliseconds: 10000));
   final Map<String, StreamSubscription?> subscriptions = {};
@@ -293,6 +303,7 @@ class HiddifyCoreService with InfraLogger {
 
   TaskEither<ConnectionFailure, Unit> start(String path, String name, bool disableMemoryLimit) {
     return TaskEither(() async {
+      _stopInProgress = false;
       statusController.add(currentState = const CoreStatus.starting());
       loggy.debug("starting");
       final background = await core.setupBackground(path, name);
@@ -362,6 +373,8 @@ class HiddifyCoreService with InfraLogger {
   TaskEither<String, Unit> stop() {
     return TaskEither(() async {
       loggy.debug("stopping");
+      _stopInProgress = true;
+      statusController.add(currentState = const CoreStatus.stopping());
       var errMsg = "";
       try {
         await core.bgClient.stop(Empty());
@@ -376,6 +389,7 @@ class HiddifyCoreService with InfraLogger {
         // left("failed to stop core: $e");
       }
       if (!await core.stop()) {}
+      _stopInProgress = false;
       statusController.add(currentState = const CoreStatus.stopped());
       if (errMsg.isNotEmpty) return left(errMsg);
       return right(unit);
@@ -385,6 +399,7 @@ class HiddifyCoreService with InfraLogger {
   TaskEither<String, Unit> restart(String path, String name, bool disableMemoryLimit) {
     return TaskEither(() async {
       loggy.debug("restarting");
+      _stopInProgress = false;
       // if (!await core.restart(path, name)) {
       try {
         final res = await core.bgClient.restart(
@@ -396,6 +411,10 @@ class HiddifyCoreService with InfraLogger {
       } on GrpcError catch (e) {
         loggy.error("failed to restart bg core: $e");
         await _logGeneratedConfigDiagnostics("restart grpc error");
+        if (isRecoverableRestartGrpcDisconnect(e)) {
+          loggy.warning("restart bg core transport closed; falling back to full stop/start");
+          return _restartByStopStart(path, name, disableMemoryLimit).run();
+        }
         if (e.code == StatusCode.unknown && !(e.message?.contains("HTTP/2 error") ?? false)) {
           return left("${e.message}");
         }
@@ -411,6 +430,10 @@ class HiddifyCoreService with InfraLogger {
       // }
       // return right(unit);
     });
+  }
+
+  TaskEither<String, Unit> _restartByStopStart(String path, String name, bool disableMemoryLimit) {
+    return stop().flatMap((_) => start(path, name, disableMemoryLimit).mapLeft((failure) => "$failure"));
   }
 
   TaskEither<String, Unit> resetTunnel() {
@@ -620,6 +643,13 @@ class HiddifyCoreService with InfraLogger {
                   loggy.warning("status listener [$key] done");
                 }),
           ).doOnData((event) {
+            if (_stopInProgress && event is CoreStarted) {
+              loggy.debug("ignoring started status while stop is in progress");
+              return;
+            }
+            if (event is CoreStopped) {
+              _stopInProgress = false;
+            }
             currentState = event;
             statusController.add(currentState);
           }),

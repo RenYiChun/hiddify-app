@@ -11,7 +11,10 @@ void main() {
     });
 
     test("marks started core as checking when no test result exists yet", () {
-      expect(connectionStatusFromCore(const CoreStatus.started(), activeGroups: []), const Checking());
+      final emptyGroupsStatus = connectionStatusFromCore(const CoreStatus.started(), activeGroups: []);
+      expect(emptyGroupsStatus, const Checking());
+      expect(emptyGroupsStatus.isConnected, isFalse);
+      expect(emptyGroupsStatus.isServiceRunning, isTrue);
 
       expect(
         connectionStatusFromCore(
@@ -143,6 +146,44 @@ void main() {
       ).take(2).toList();
 
       expect(statuses, [const Disconnecting(), const Connected()]);
+    });
+
+    test("recovers stale stopping state to checking when active groups have no delay yet", () async {
+      final statuses = await connectionStatusUpdatesFromCore(
+        Stream.value(const CoreStatus.stopping()),
+        () => Stream.value([
+          _group("select", selected: "balance", items: [_info("balance", isGroup: true, delay: 0)]),
+          _group("balance", selected: "node-a", items: [_info("node-a", delay: 0)]),
+        ]),
+        disconnectingRecoveryDelay: Duration.zero,
+      ).take(2).toList();
+
+      expect(statuses, [const Disconnecting(), const Checking()]);
+    });
+
+    test("does not recover stopping state while an explicit disconnect is active", () async {
+      final statuses = await connectionStatusUpdatesFromCore(
+        Stream.value(const CoreStatus.stopping()),
+        () => Stream.value([
+          _group("select", selected: "node-a", items: [_info("node-a", delay: 176)]),
+        ]),
+        disconnectingRecoveryDelay: Duration.zero,
+        isExplicitDisconnecting: () => true,
+      ).toList();
+
+      expect(statuses, [const Disconnecting()]);
+    });
+
+    test("suppresses started replays while an explicit disconnect is active", () async {
+      final statuses = await connectionStatusUpdatesFromCore(
+        Stream.value(const CoreStatus.started()),
+        () => Stream.value([
+          _group("select", selected: "node-a", items: [_info("node-a", delay: 176)]),
+        ]),
+        isExplicitDisconnecting: () => true,
+      ).toList();
+
+      expect(statuses, [const Disconnecting()]);
     });
   });
 }

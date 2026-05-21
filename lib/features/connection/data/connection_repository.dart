@@ -73,7 +73,11 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
 
   @override
   Stream<ConnectionStatus> watchConnectionStatus() {
-    return connectionStatusUpdatesFromCore(singbox.watchStatus(), singbox.watchActiveGroups);
+    return connectionStatusUpdatesFromCore(
+      singbox.watchStatus(),
+      singbox.watchActiveGroups,
+      isExplicitDisconnecting: () => singbox.isStopInProgress,
+    );
   }
 
   @override
@@ -132,6 +136,10 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
       loggy.warning("using IPv4-only direct DNS strategy because IPv6 mode is disabled");
       runtimeOptions = runtimeOptions.copyWith(directDnsDomainStrategy: DomainStrategy.ipv4Only);
     }
+    if (runtimeOptions.ipv6Mode == IPv6Mode.disable && runtimeOptions.remoteDnsDomainStrategy == DomainStrategy.auto) {
+      loggy.warning("using IPv4-only remote DNS strategy because IPv6 mode is disabled");
+      runtimeOptions = runtimeOptions.copyWith(remoteDnsDomainStrategy: DomainStrategy.ipv4Only);
+    }
 
     return runtimeOptions;
   }
@@ -142,8 +150,14 @@ Stream<ConnectionStatus> connectionStatusUpdatesFromCore(
   Stream<CoreStatus> statusEvents,
   Stream<List<OutboundGroup>> Function() watchActiveGroups, {
   Duration disconnectingRecoveryDelay = const Duration(seconds: 2),
+  bool Function()? isExplicitDisconnecting,
 }) {
+  bool disconnectingOverrideActive() => isExplicitDisconnecting?.call() ?? false;
+
   return statusEvents.distinct().switchMap((event) {
+    if (disconnectingOverrideActive() && event is CoreStarted) {
+      return Stream.value(const Disconnecting());
+    }
     if (event case CoreStarted()) {
       return watchActiveGroups()
           .map((groups) => connectionStatusFromCore(event, activeGroups: groups))
@@ -152,9 +166,10 @@ Stream<ConnectionStatus> connectionStatusUpdatesFromCore(
     if (event case CoreStopping()) {
       return Stream<ConnectionStatus>.value(const Disconnecting()).concatWith([
         Rx.timer(null, disconnectingRecoveryDelay)
+            .where((_) => !disconnectingOverrideActive())
             .asyncExpand((_) => watchActiveGroups())
             .map((groups) => connectionStatusFromCore(const CoreStatus.started(), activeGroups: groups))
-            .where((status) => status.isConnected)
+            .where((status) => status.isServiceRunning)
             .onErrorResumeNext(const Stream.empty())
             .take(1),
       ]);

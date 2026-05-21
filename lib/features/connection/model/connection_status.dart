@@ -17,6 +17,11 @@ sealed class ConnectionStatus with _$ConnectionStatus {
   const factory ConnectionStatus.disconnecting() = Disconnecting;
 
   bool get isConnected => switch (this) {
+    Connected() => true,
+    _ => false,
+  };
+
+  bool get isServiceRunning => switch (this) {
     Connected() || Checking() || OutboundUnavailable() || CurrentOutboundUnavailable() => true,
     _ => false,
   };

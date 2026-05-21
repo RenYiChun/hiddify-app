@@ -39,10 +39,23 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
 
   final stopWatch = Stopwatch()..start();
 
-  final container = ProviderContainer(overrides: [environmentProvider.overrideWithValue(env)]);
+  final container = ProviderContainer(
+    overrides: [environmentProvider.overrideWithValue(env)],
+    observers: [RiverpodObserver()],
+  );
 
   await _init("directories", () => container.read(appDirectoriesProvider.future));
-  LoggerController.init(container.read(logPathResolverProvider).appFile().path);
+  final logPathResolver = container.read(logPathResolverProvider);
+  if (!kIsWeb) {
+    if (!await logPathResolver.directory.exists()) {
+      await logPathResolver.directory.create(recursive: true);
+    }
+    await logPathResolver.cleanupLegacyTopLevelLogs();
+    if (!await logPathResolver.dataDirectory.exists()) {
+      await logPathResolver.dataDirectory.create(recursive: true);
+    }
+  }
+  LoggerController.init(logPathResolver.appFile().path);
 
   final appInfo = await _init("app info", () => container.read(appInfoProvider.future));
   await _init("preferences", () => container.read(sharedPreferencesProvider.future));
@@ -115,9 +128,8 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
   stopWatch.stop();
 
   runApp(
-    ProviderScope(
-      parent: container,
-      observers: [RiverpodObserver()],
+    UncontrolledProviderScope(
+      container: container,
       child: SentryUserInteractionWidget(child: const App()),
     ),
   );
