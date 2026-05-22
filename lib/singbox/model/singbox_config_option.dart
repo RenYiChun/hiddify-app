@@ -46,6 +46,8 @@ class SingboxConfigOption with _$SingboxConfigOption {
     required bool allowConnectionFromLan,
     required int directRouteConnectionLimit,
     required int proxyRouteConnectionLimit,
+    required bool enableProcessDirectRules,
+    required List<String> processDirectRuleNames,
     required bool enableDynamicDirectBypass,
     @IntervalInSecondsConverter() required Duration dynamicDirectBypassTtl,
     required int dynamicDirectBypassMaxRoutes,

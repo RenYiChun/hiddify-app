@@ -6,6 +6,7 @@ import 'package:hiddify/core/model/constants.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
+import 'package:hiddify/features/proxy/model/proxy_failure.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/gen/assets.gen.dart';
@@ -36,7 +37,11 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
     final urlTestDelay = await ref
         .watch(activeProxyNotifierProvider.future)
         .catchError((e) {
-          loggy.warning("error getting active proxy", e);
+          if (e is ServiceNotRunning) {
+            loggy.debug("active proxy unavailable while service is not running");
+          } else {
+            loggy.warning("error getting active proxy", e);
+          }
           return OutboundInfo(urlTestDelay: 0);
         })
         .then((connection) => connection.urlTestDelay);

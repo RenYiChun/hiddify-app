@@ -17,6 +17,7 @@ import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore_service.pbgrpc.dart';
 import 'package:hiddify/hiddifycore/init_signal.dart';
 import 'package:hiddify/singbox/model/core_status.dart';
+import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/singbox/model/singbox_config_option.dart';
 import 'package:hiddify/singbox/model/warp_account.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
@@ -31,6 +32,24 @@ bool isRecoverableRestartGrpcDisconnect(GrpcError error) {
   if (error.code != StatusCode.unknown) return false;
   final message = error.message ?? "";
   return message.contains("HTTP/2 error") && message.contains("Connection is being forcefully terminated");
+}
+
+typedef RuntimeOptionWarningLogger = void Function(String message);
+
+@visibleForTesting
+SingboxConfigOption normalizeCoreRuntimeOptions(SingboxConfigOption options, {RuntimeOptionWarningLogger? logWarning}) {
+  var runtimeOptions = options;
+
+  if (runtimeOptions.ipv6Mode == IPv6Mode.disable && runtimeOptions.directDnsDomainStrategy == DomainStrategy.auto) {
+    logWarning?.call("using IPv4-only direct DNS strategy because IPv6 mode is disabled");
+    runtimeOptions = runtimeOptions.copyWith(directDnsDomainStrategy: DomainStrategy.ipv4Only);
+  }
+  if (runtimeOptions.ipv6Mode == IPv6Mode.disable && runtimeOptions.remoteDnsDomainStrategy == DomainStrategy.auto) {
+    logWarning?.call("using IPv4-only remote DNS strategy because IPv6 mode is disabled");
+    runtimeOptions = runtimeOptions.copyWith(remoteDnsDomainStrategy: DomainStrategy.ipv4Only);
+  }
+
+  return runtimeOptions;
 }
 
 class HiddifyCoreService with InfraLogger {
@@ -112,6 +131,10 @@ class HiddifyCoreService with InfraLogger {
 
       final dns = decoded["dns"];
       final route = decoded["route"];
+      loggy.info(
+        "core generated config [$phase] dns: "
+        "${_summarizeConfigMap(dns, ["strategy", "final", "disable_expire", "independent_cache"])}",
+      );
       loggy.info(
         "core generated config [$phase] inbounds: "
         "${_summarizeConfigEntries(decoded["inbounds"], ["tag", "type", "address", "stack", "mtu", "auto_route", "strict_route", "route_exclude_address", "listen", "listen_port", "set_system_proxy"])}",
@@ -278,17 +301,17 @@ class HiddifyCoreService with InfraLogger {
 
   TaskEither<String, Unit> changeOptions(SingboxConfigOption options) {
     return TaskEither(() async {
+      final runtimeOptions = normalizeCoreRuntimeOptions(options, logWarning: loggy.warning);
+      final settingsJson = jsonEncode(runtimeOptions.toJson());
       loggy.debug("changing options");
-      _logConfigOptionDiagnostics(options);
+      _logConfigOptionDiagnostics(runtimeOptions);
       // latestOptions = options;
       try {
         final res = await core.fgClient.changeHiddifySettings(
-          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(options.toJson())),
+          ChangeHiddifySettingsRequest(hiddifySettingsJson: settingsJson),
         );
         if (res.messageType != MessageType.EMPTY) return left("${res.messageType} ${res.message}");
-        await core.bgClient.changeHiddifySettings(
-          ChangeHiddifySettingsRequest(hiddifySettingsJson: jsonEncode(options.toJson())),
-        );
+        await core.bgClient.changeHiddifySettings(ChangeHiddifySettingsRequest(hiddifySettingsJson: settingsJson));
       } on GrpcError catch (e) {
         if (e.code == StatusCode.unavailable) {
           loggy.debug("background core is not started yet! $e");
@@ -634,13 +657,13 @@ class HiddifyCoreService with InfraLogger {
             cc
                 .coreInfoListener(Empty(), options: grpcOptions)
                 .doOnCancel(() {
-                  loggy.warning("status listener [$key] canceled");
+                  loggy.debug("status listener [$key] canceled");
                 })
                 .doOnData((event) {
                   loggy.debug("status", event);
                 })
                 .doOnDone(() {
-                  loggy.warning("status listener [$key] done");
+                  loggy.debug("status listener [$key] done");
                 }),
           ).doOnData((event) {
             if (_stopInProgress && event is CoreStarted) {

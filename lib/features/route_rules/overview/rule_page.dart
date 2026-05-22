@@ -5,6 +5,7 @@ import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_notifier.dart';
 import 'package:hiddify/features/route_rules/overview/android_apps_page.dart';
 import 'package:hiddify/features/route_rules/overview/generic_list_page.dart';
+import 'package:hiddify/features/route_rules/overview/running_processes_page.dart';
 import 'package:hiddify/features/route_rules/widget/setting_checkbox.dart';
 import 'package:hiddify/features/route_rules/widget/setting_divider.dart';
 import 'package:hiddify/features/route_rules/widget/setting_generic_list.dart';
@@ -119,14 +120,7 @@ class RulePage extends HookConsumerWidget {
                 values: ref.watch(ruleNotifierProvider(ruleListOrder).select((value) => value.processNames)),
                 onTap: () => Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (context) => GenericListPage(
-                      ruleListOrder: ruleListOrder,
-                      ruleEnum: RuleEnum.processName,
-                      validator: (value) {
-                        if (isProcessName('$value')) return null;
-                        return t.pages.settings.routing.routeRule.rule.validProcessName;
-                      },
-                    ),
+                    builder: (context) => RunningProcessesPage(ruleListOrder: ruleListOrder),
                     fullscreenDialog: true,
                   ),
                 ),

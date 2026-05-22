@@ -7,8 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:hiddify/core/directories/directories_provider.dart';
 import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
+import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
+import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/hiddifycore/generated/v2/config/route_rule.pb.dart';
 import 'package:hiddify/utils/utils.dart';
+import 'package:path/path.dart' as p;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 part 'rules_notifier.g.dart';
@@ -20,7 +23,7 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
   @override
   List<Rule> build() {
     final directories = ref.watch(appDirectoriesProvider).requireValue;
-    file = File('${directories.baseDir.path}/route_rule.proto');
+    file = File(p.join(directories.workingDir.path, 'route_rule.proto'));
     if (file.existsSync()) {
       return RouteRule.fromBuffer(file.readAsBytesSync()).rules;
     } else {
@@ -158,6 +161,7 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
     if (await file.exists()) {
       await file.delete(recursive: true);
       state = <Rule>[];
+      await _reloadRunningService();
     }
   }
 
@@ -168,6 +172,7 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
     final sortedRules = state..sort((a, b) => a.listOrder.compareTo(b.listOrder));
     final routeRules = RouteRule(rules: sortedRules);
     await file.writeAsBytes(routeRules.writeToBuffer());
+    await _reloadRunningService();
   }
 
   List<Rule> _updateListOrder(List<Rule> rules) {
@@ -175,5 +180,16 @@ class RulesNotifier extends _$RulesNotifier with AppLogger {
       rules[i].listOrder = i;
     }
     return rules;
+  }
+
+  Future<void> _reloadRunningService() async {
+    try {
+      final serviceRunning = await ref.read(serviceRunningProvider.future);
+      if (!serviceRunning) return;
+      final activeProfile = await ref.read(activeProfileProvider.future);
+      await ref.read(connectionNotifierProvider.notifier).reconnect(activeProfile);
+    } catch (e, st) {
+      loggy.warning("error reloading connection after route rules changed", e, st);
+    }
   }
 }

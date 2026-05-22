@@ -2,6 +2,7 @@ import 'package:dartx/dartx.dart';
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/model/optional_range.dart';
 import 'package:hiddify/core/model/region.dart';
+import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/core/utils/json_converters.dart';
 import 'package:hiddify/core/utils/preferences_utils.dart';
@@ -14,6 +15,44 @@ import 'package:hiddify/singbox/model/singbox_rule.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+const _processDirectRuleNamesSeparator = ";";
+
+List<String> defaultProcessDirectRuleNamesForRegion(Region region) => switch (region) {
+  Region.cn => const [
+    "crashpad_handler.exe",
+    "FlutterPlugins.exe",
+    "WeChatOCR.exe",
+    "WeMail.exe",
+    "WXDrive_x64.exe",
+    "WXWork.exe",
+    "WXWorkWeb.exe",
+    "WXWorkXNet.exe",
+    "Weixin.exe",
+    "DingTalk.exe",
+    "DingTalkHelper.exe",
+  ],
+  _ => const [],
+};
+
+List<String> parseProcessDirectRuleNames(String value) =>
+    _cleanProcessDirectRuleNames(value.split(_processDirectRuleNamesSeparator));
+
+String formatProcessDirectRuleNames(List<String> values) =>
+    _cleanProcessDirectRuleNames(values).join(_processDirectRuleNamesSeparator);
+
+List<String> _cleanProcessDirectRuleNames(Iterable<String> values) {
+  final names = <String>[];
+  final seen = <String>{};
+  for (final value in values) {
+    final name = value.trim();
+    if (name.isEmpty) continue;
+    final key = name.toLowerCase();
+    if (!seen.add(key)) continue;
+    names.add(name);
+  }
+  return names;
+}
 
 abstract class ConfigOptions {
   static final serviceMode = PreferencesNotifier.create<ServiceMode, String>(
@@ -183,6 +222,22 @@ abstract class ConfigOptions {
     256,
     validator: (value) => value > 0,
   );
+
+  static final enableProcessDirectRules = PreferencesNotifier.create<bool, bool>("enable-process-direct-rules", true);
+
+  static final processDirectRuleNames = PreferencesNotifier.create<List<String>, String>(
+    "process-direct-rule-names",
+    const [],
+    mapFrom: parseProcessDirectRuleNames,
+    mapTo: formatProcessDirectRuleNames,
+  );
+
+  static final effectiveProcessDirectRuleNames = Provider<List<String>>((ref) {
+    final configured = ref.watch(processDirectRuleNames);
+    final preferences = ref.watch(sharedPreferencesProvider).requireValue;
+    if (preferences.containsKey("process-direct-rule-names")) return configured;
+    return defaultProcessDirectRuleNamesForRegion(ref.watch(region));
+  });
 
   static final enableDynamicDirectBypass = PreferencesNotifier.create<bool, bool>("enable-dynamic-direct-bypass", true);
 
@@ -362,6 +417,8 @@ abstract class ConfigOptions {
     "allow-connection-from-lan": allowConnectionFromLan,
     "direct-route-connection-limit": directRouteConnectionLimit,
     "proxy-route-connection-limit": proxyRouteConnectionLimit,
+    "enable-process-direct-rules": enableProcessDirectRules,
+    "process-direct-rule-names": processDirectRuleNames,
     "enable-dynamic-direct-bypass": enableDynamicDirectBypass,
     "dynamic-direct-bypass-ttl": dynamicDirectBypassTtl,
     "dynamic-direct-bypass-max-routes": dynamicDirectBypassMaxRoutes,
@@ -478,6 +535,8 @@ abstract class ConfigOptions {
       allowConnectionFromLan: ref.watch(allowConnectionFromLan),
       directRouteConnectionLimit: ref.watch(directRouteConnectionLimit),
       proxyRouteConnectionLimit: ref.watch(proxyRouteConnectionLimit),
+      enableProcessDirectRules: ref.watch(enableProcessDirectRules),
+      processDirectRuleNames: ref.watch(effectiveProcessDirectRuleNames),
       enableDynamicDirectBypass: ref.watch(enableDynamicDirectBypass),
       dynamicDirectBypassTtl: ref.watch(dynamicDirectBypassTtl),
       dynamicDirectBypassMaxRoutes: ref.watch(dynamicDirectBypassMaxRoutes),

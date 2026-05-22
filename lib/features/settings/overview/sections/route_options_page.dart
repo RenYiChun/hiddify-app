@@ -7,6 +7,7 @@ import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/per_app_proxy/model/per_app_proxy_mode.dart';
 import 'package:hiddify/features/per_app_proxy/overview/per_app_proxy_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/features/settings/overview/sections/process_direct_rules_page.dart';
 import 'package:hiddify/features/settings/widget/preference_tile.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -18,6 +19,7 @@ class RouteOptionsPage extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final t = ref.watch(translationsProvider).requireValue;
     final perAppProxy = ref.watch(Preferences.perAppProxyMode).enabled;
+    final processDirectRuleNames = ref.watch(ConfigOptions.effectiveProcessDirectRuleNames);
     return Scaffold(
       appBar: AppBar(title: Text(t.pages.settings.routing.title)),
       body: ListView(
@@ -89,10 +91,33 @@ class RouteOptionsPage extends HookConsumerWidget {
             onChanged: ref.read(ConfigOptions.bypassLan.notifier).update,
           ),
           SwitchListTile.adaptive(
+            title: const Text('启用进程直连规则'),
+            subtitle: Text('${processDirectRuleNames.length} 个进程'),
+            secondary: const Icon(Icons.account_tree_rounded),
+            value: ref.watch(ConfigOptions.enableProcessDirectRules),
+            onChanged: ref.read(ConfigOptions.enableProcessDirectRules.notifier).update,
+          ),
+          ListTile(
+            title: const Text('进程直连规则'),
+            subtitle: Text(
+              processDirectRuleNames.isEmpty ? t.common.empty : processDirectRuleNames.join(', '),
+              overflow: TextOverflow.ellipsis,
+            ),
+            leading: const Icon(Icons.task_alt_rounded),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (context) => const ProcessDirectRulesPage(), fullscreenDialog: true)),
+          ),
+          SwitchListTile.adaptive(
             title: Text(t.pages.settings.routing.resolveDestination),
             secondary: const Icon(Icons.security_rounded),
             value: ref.watch(ConfigOptions.resolveDestination),
             onChanged: ref.read(ConfigOptions.resolveDestination.notifier).update,
+          ),
+          ListTile(
+            title: Text(t.pages.settings.routing.routeRule.title),
+            leading: const Icon(Icons.rule_rounded),
+            onTap: () => context.goNamed('routeRules'),
           ),
           ChoicePreferenceWidget(
             selected: ref.watch(ConfigOptions.ipv6Mode),

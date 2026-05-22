@@ -7,12 +7,16 @@
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
 
-FlutterWindow::~FlutterWindow() {}
+FlutterWindow::~FlutterWindow() {
+  Destroy();
+}
 
 bool FlutterWindow::OnCreate() {
   if (!Win32Window::OnCreate()) {
     return false;
   }
+
+  destroying_flutter_controller_ = false;
 
   RECT frame = GetClientArea();
 
@@ -41,8 +45,10 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  destroying_flutter_controller_ = true;
   if (flutter_controller_) {
-    flutter_controller_ = nullptr;
+    auto controller = std::move(flutter_controller_);
+    controller.reset();
   }
 
   Win32Window::OnDestroy();
@@ -53,7 +59,7 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
                               WPARAM const wparam,
                               LPARAM const lparam) noexcept {
   // Give Flutter, including plugins, an opportunity to handle window messages.
-  if (flutter_controller_) {
+  if (!destroying_flutter_controller_ && flutter_controller_) {
     std::optional<LRESULT> result =
         flutter_controller_->HandleTopLevelWindowProc(hwnd, message, wparam,
                                                       lparam);
@@ -64,7 +70,10 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
 
   switch (message) {
     case WM_FONTCHANGE:
-      flutter_controller_->engine()->ReloadSystemFonts();
+      if (!destroying_flutter_controller_ && flutter_controller_ &&
+          flutter_controller_->engine()) {
+        flutter_controller_->engine()->ReloadSystemFonts();
+      }
       break;
   }
 

@@ -12,7 +12,6 @@ import 'package:hiddify/features/settings/notifier/warp_option/warp_option_notif
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service.dart';
 import 'package:hiddify/singbox/model/core_status.dart';
-import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/singbox/model/singbox_config_option.dart';
 import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -105,7 +104,7 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
           .mapLeft((l) => ConnectionFailure.invalidConfigOption(null, l))
           .flatMap(
             (overridedOptions) => TaskEither.tryCatch(() async {
-              final runtimeOptions = _normalizeRuntimeOptions(overridedOptions);
+              final runtimeOptions = normalizeCoreRuntimeOptions(overridedOptions, logWarning: loggy.warning);
               final isWarpLicenseAgreed = ref.read(warpLicenseNotifierProvider);
               final isWarpEnabled = runtimeOptions.warp.enable || runtimeOptions.warp2.enable;
               if (!isWarpLicenseAgreed && isWarpEnabled) {
@@ -128,21 +127,6 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
               return unit;
             }, (err, st) => err is ConnectionFailure ? err : ConnectionFailure.unexpected(err, st)),
           );
-
-  SingboxConfigOption _normalizeRuntimeOptions(SingboxConfigOption options) {
-    var runtimeOptions = options;
-
-    if (runtimeOptions.ipv6Mode == IPv6Mode.disable && runtimeOptions.directDnsDomainStrategy == DomainStrategy.auto) {
-      loggy.warning("using IPv4-only direct DNS strategy because IPv6 mode is disabled");
-      runtimeOptions = runtimeOptions.copyWith(directDnsDomainStrategy: DomainStrategy.ipv4Only);
-    }
-    if (runtimeOptions.ipv6Mode == IPv6Mode.disable && runtimeOptions.remoteDnsDomainStrategy == DomainStrategy.auto) {
-      loggy.warning("using IPv4-only remote DNS strategy because IPv6 mode is disabled");
-      runtimeOptions = runtimeOptions.copyWith(remoteDnsDomainStrategy: DomainStrategy.ipv4Only);
-    }
-
-    return runtimeOptions;
-  }
 }
 
 @visibleForTesting

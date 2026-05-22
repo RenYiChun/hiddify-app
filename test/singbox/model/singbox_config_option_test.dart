@@ -6,7 +6,7 @@ import 'package:hiddify/singbox/model/singbox_config_option.dart';
 
 void main() {
   test("serializes route connection limits", () {
-    final options = SingboxConfigOption(
+    const options = SingboxConfigOption(
       region: "cn",
       balancerStrategy: BalancerStrategy.roundRobin,
       blockAds: false,
@@ -27,7 +27,7 @@ void main() {
       mtu: 9000,
       strictRoute: true,
       connectionTestUrl: "https://cp.cloudflare.com",
-      urlTestInterval: const Duration(minutes: 10),
+      urlTestInterval: Duration(minutes: 10),
       enableClashApi: true,
       clashApiPort: 16756,
       enableTun: true,
@@ -36,14 +36,16 @@ void main() {
       allowConnectionFromLan: false,
       directRouteConnectionLimit: 512,
       proxyRouteConnectionLimit: 128,
+      enableProcessDirectRules: true,
+      processDirectRuleNames: ["WXWork.exe", "WeChat.exe"],
       enableDynamicDirectBypass: true,
-      dynamicDirectBypassTtl: const Duration(minutes: 15),
+      dynamicDirectBypassTtl: Duration(minutes: 15),
       dynamicDirectBypassMaxRoutes: 128,
       dynamicDirectBypassMaxRoutesPerHost: 16,
       enableFakeDns: false,
       independentDnsCache: true,
-      rules: const [],
-      tlsTricks: const SingboxTlsTricks(
+      rules: [],
+      tlsTricks: SingboxTlsTricks(
         enableFragment: false,
         fragmentSize: OptionalRange(min: 10, max: 30),
         fragmentSleep: OptionalRange(min: 2, max: 8),
@@ -58,6 +60,8 @@ void main() {
     final json = options.toJson();
     expect(json["direct-route-connection-limit"], 512);
     expect(json["proxy-route-connection-limit"], 128);
+    expect(json["enable-process-direct-rules"], true);
+    expect(json["process-direct-rule-names"], ["WXWork.exe", "WeChat.exe"]);
     expect(json["enable-dynamic-direct-bypass"], true);
     expect(json.containsKey("dynamic-direct-bypass-threshold"), false);
     expect(json["dynamic-direct-bypass-ttl"], 900);
@@ -65,6 +69,8 @@ void main() {
     expect(json["dynamic-direct-bypass-max-routes-per-host"], 16);
     expect(SingboxConfigOption.fromJson(json).directRouteConnectionLimit, 512);
     expect(SingboxConfigOption.fromJson(json).proxyRouteConnectionLimit, 128);
+    expect(SingboxConfigOption.fromJson(json).enableProcessDirectRules, true);
+    expect(SingboxConfigOption.fromJson(json).processDirectRuleNames, ["WXWork.exe", "WeChat.exe"]);
     expect(SingboxConfigOption.fromJson(json).enableDynamicDirectBypass, true);
     expect(SingboxConfigOption.fromJson(json).dynamicDirectBypassTtl, const Duration(minutes: 15));
     expect(SingboxConfigOption.fromJson(json).dynamicDirectBypassMaxRoutes, 128);
