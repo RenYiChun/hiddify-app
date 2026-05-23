@@ -19,6 +19,12 @@ void main() {
     "DingTalk.exe",
     "DingTalkHelper.exe",
   ];
+  const codexStableProxyDefaults = [
+    "Codex.exe",
+    "codex.exe",
+    "codex-acp-x64-windows.exe",
+    "codex-x86_64-pc-windows-msvc.exe",
+  ];
 
   test("enables bypass LAN by default", () async {
     SharedPreferences.setMockInitialValues({});
@@ -38,10 +44,7 @@ void main() {
     expect(container.read(ConfigOptions.region), Region.cn);
     expect(container.read(ConfigOptions.enableProcessDirectRules), isTrue);
     expect(container.read(ConfigOptions.processDirectRuleNames), isEmpty);
-    expect(
-      container.read(ConfigOptions.effectiveProcessDirectRuleNames),
-      cnProcessDirectDefaults,
-    );
+    expect(container.read(ConfigOptions.effectiveProcessDirectRuleNames), cnProcessDirectDefaults);
   });
 
   test("applies CN process direct defaults after region changes before the user customizes the list", () async {
@@ -55,10 +58,7 @@ void main() {
 
     await container.read(ConfigOptions.region.notifier).update(Region.cn);
 
-    expect(
-      container.read(ConfigOptions.singboxConfigOptions).processDirectRuleNames,
-      cnProcessDirectDefaults,
-    );
+    expect(container.read(ConfigOptions.singboxConfigOptions).processDirectRuleNames, cnProcessDirectDefaults);
   });
 
   test("keeps an empty process direct list after the user clears it", () async {
@@ -69,5 +69,32 @@ void main() {
 
     expect(container.read(ConfigOptions.processDirectRuleNames), isEmpty);
     expect(container.read(ConfigOptions.effectiveProcessDirectRuleNames), isEmpty);
+  });
+
+  test("uses Codex process stable proxy defaults before the user customizes the list", () async {
+    SharedPreferences.setMockInitialValues({});
+    final preferences = await SharedPreferences.getInstance();
+    final container = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) => preferences)]);
+    addTearDown(container.dispose);
+
+    expect(container.read(ConfigOptions.enableProcessStableProxyRules), isTrue);
+    expect(container.read(ConfigOptions.processStableProxyRuleNames), isEmpty);
+    expect(container.read(ConfigOptions.effectiveProcessStableProxyRuleNames), codexStableProxyDefaults);
+    expect(container.read(ConfigOptions.singboxConfigOptions).processStableProxyRuleNames, codexStableProxyDefaults);
+    expect(container.read(ConfigOptions.singboxConfigOptions).processStableProxyExcludedOutboundKeywords, [
+      "naive",
+      "quic",
+      "tuic",
+    ]);
+  });
+
+  test("keeps an empty process stable proxy list after the user clears it", () async {
+    SharedPreferences.setMockInitialValues({"process-stable-proxy-rule-names": ""});
+    final preferences = await SharedPreferences.getInstance();
+    final container = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) => preferences)]);
+    addTearDown(container.dispose);
+
+    expect(container.read(ConfigOptions.processStableProxyRuleNames), isEmpty);
+    expect(container.read(ConfigOptions.effectiveProcessStableProxyRuleNames), isEmpty);
   });
 }

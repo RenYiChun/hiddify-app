@@ -52,6 +52,61 @@ SingboxConfigOption normalizeCoreRuntimeOptions(SingboxConfigOption options, {Ru
   return runtimeOptions;
 }
 
+@visibleForTesting
+String summarizeConfigEntriesForDiagnostics(dynamic entries, List<String> keys) {
+  if (entries is! List) return "[]";
+  final summary = entries
+      .whereType<Map>()
+      .map((entry) {
+        final normalized = entry.map((key, value) => MapEntry("$key", value));
+        return summarizeConfigMapForDiagnostics(normalized, keys);
+      })
+      .where((entry) => entry.isNotEmpty);
+  return summary.isEmpty ? "[]" : summary.join("; ");
+}
+
+@visibleForTesting
+String summarizeConfigMapForDiagnostics(dynamic value, List<String> keys) {
+  if (value is! Map) return "{}";
+  final normalized = value.map((key, mapValue) => MapEntry("$key", mapValue));
+  return keys
+      .where((key) => normalized.containsKey(key) && normalized[key] != null)
+      .map((key) => "$key=${formatConfigValueForDiagnostics(normalized[key])}")
+      .join(", ");
+}
+
+@visibleForTesting
+String summarizeProxyGroupOutboundsForDiagnostics(dynamic entries) {
+  if (entries is! List) return "[]";
+  final groupTags = {"select", "lowest", "balance", "process-stable-proxy §hide§"};
+  final summary = entries.whereType<Map>().where((entry) => groupTags.contains("${entry["tag"]}")).map((entry) {
+    final normalized = entry.map((key, value) => MapEntry("$key", value));
+    return summarizeConfigMapForDiagnostics(normalized, [
+      "tag",
+      "type",
+      "default",
+      "strategy",
+      "outbounds",
+      "tolerance",
+      "delay_acceptable_ratio",
+      "interrupt_exist_connections",
+    ]);
+  });
+  return summary.isEmpty ? "[]" : summary.join("; ");
+}
+
+@visibleForTesting
+String formatConfigValueForDiagnostics(dynamic value) {
+  if (value is List) {
+    const limit = 8;
+    final shown = value.take(limit).join(",");
+    final suffix = value.length > limit ? ",... len=${value.length}" : "";
+    return "[$shown$suffix]";
+  }
+  if (value is Map) return jsonEncode(value);
+  return "$value";
+}
+
 class HiddifyCoreService with InfraLogger {
   HiddifyCoreService(this.ref);
   final Ref ref;
@@ -102,6 +157,11 @@ class HiddifyCoreService with InfraLogger {
       "allowLan=${options.allowConnectionFromLan}, "
       "directRouteConnectionLimit=${options.directRouteConnectionLimit}, "
       "proxyRouteConnectionLimit=${options.proxyRouteConnectionLimit}, "
+      "processDirectRules=${options.enableProcessDirectRules}, "
+      "processDirectNames=${formatConfigValueForDiagnostics(options.processDirectRuleNames)}, "
+      "processStableProxyRules=${options.enableProcessStableProxyRules}, "
+      "processStableProxyNames=${formatConfigValueForDiagnostics(options.processStableProxyRuleNames)}, "
+      "processStableProxyExcludedKeywords=${formatConfigValueForDiagnostics(options.processStableProxyExcludedOutboundKeywords)}, "
       "dynamicDirectBypass=${options.enableDynamicDirectBypass}, "
       "dynamicDirectBypassMode=all-direct, "
       "dynamicDirectBypassTtl=${options.dynamicDirectBypassTtl.inSeconds}s, "
@@ -133,86 +193,35 @@ class HiddifyCoreService with InfraLogger {
       final route = decoded["route"];
       loggy.info(
         "core generated config [$phase] dns: "
-        "${_summarizeConfigMap(dns, ["strategy", "final", "disable_expire", "independent_cache"])}",
+        "${summarizeConfigMapForDiagnostics(dns, ["strategy", "final", "disable_expire", "independent_cache"])}",
       );
       loggy.info(
         "core generated config [$phase] inbounds: "
-        "${_summarizeConfigEntries(decoded["inbounds"], ["tag", "type", "address", "stack", "mtu", "auto_route", "strict_route", "route_exclude_address", "listen", "listen_port", "set_system_proxy"])}",
+        "${summarizeConfigEntriesForDiagnostics(decoded["inbounds"], ["tag", "type", "address", "stack", "mtu", "auto_route", "strict_route", "route_exclude_address", "listen", "listen_port", "set_system_proxy"])}",
       );
       loggy.info(
         "core generated config [$phase] dns servers: "
-        "${_summarizeConfigEntries(dns is Map ? dns["servers"] : null, ["tag", "type", "server", "server_port", "detour", "domain_resolver", "connect_timeout", "servers", "parallel"])}",
+        "${summarizeConfigEntriesForDiagnostics(dns is Map ? dns["servers"] : null, ["tag", "type", "server", "server_port", "detour", "domain_resolver", "connect_timeout", "servers", "parallel"])}",
       );
       loggy.info(
         "core generated config [$phase] dns rules: "
-        "${_summarizeConfigEntries(dns is Map ? dns["rules"] : null, ["server", "domain", "domain_suffix", "rule_set", "strategy", "rewrite_ttl"])}",
+        "${summarizeConfigEntriesForDiagnostics(dns is Map ? dns["rules"] : null, ["server", "domain", "domain_suffix", "rule_set", "strategy", "rewrite_ttl"])}",
       );
       loggy.info(
         "core generated config [$phase] route: "
-        "${_summarizeConfigMap(route, ["final", "auto_detect_interface", "default_domain_resolver", "rule_set"])}",
+        "${summarizeConfigMapForDiagnostics(route, ["final", "auto_detect_interface", "default_domain_resolver", "rule_set"])}",
       );
       loggy.info(
         "core generated config [$phase] custom: "
-        "${_summarizeConfigMap(decoded["custom"], ["hiddify-route-direct-connection-limit", "hiddify-route-proxy-connection-limit", "hiddify-dynamic-direct-bypass-enabled", "hiddify-dynamic-direct-bypass-ttl", "hiddify-dynamic-direct-bypass-max-routes", "hiddify-dynamic-direct-bypass-max-routes-per-host"])}",
+        "${summarizeConfigMapForDiagnostics(decoded["custom"], ["hiddify-route-direct-connection-limit", "hiddify-route-proxy-connection-limit", "hiddify-process-stable-proxy-enabled", "hiddify-process-stable-proxy-rule-names", "hiddify-process-stable-proxy-excluded-keywords", "hiddify-process-stable-proxy-candidate-outbounds", "hiddify-process-stable-proxy-excluded-outbounds", "hiddify-dynamic-direct-bypass-enabled", "hiddify-dynamic-direct-bypass-ttl", "hiddify-dynamic-direct-bypass-max-routes", "hiddify-dynamic-direct-bypass-max-routes-per-host"])}",
       );
       loggy.info(
         "core generated config [$phase] proxy groups: "
-        "${_summarizeProxyGroupOutbounds(decoded["outbounds"])}",
+        "${summarizeProxyGroupOutboundsForDiagnostics(decoded["outbounds"])}",
       );
     } catch (error, stackTrace) {
       loggy.warning("core generated config [$phase]: failed to read diagnostics", error, stackTrace);
     }
-  }
-
-  String _summarizeConfigEntries(dynamic entries, List<String> keys) {
-    if (entries is! List) return "[]";
-    final summary = entries
-        .whereType<Map>()
-        .map((entry) {
-          final normalized = entry.map((key, value) => MapEntry("$key", value));
-          return _summarizeConfigMap(normalized, keys);
-        })
-        .where((entry) => entry.isNotEmpty);
-    return summary.isEmpty ? "[]" : summary.join("; ");
-  }
-
-  String _summarizeConfigMap(dynamic value, List<String> keys) {
-    if (value is! Map) return "{}";
-    final normalized = value.map((key, mapValue) => MapEntry("$key", mapValue));
-    return keys
-        .where((key) => normalized.containsKey(key) && normalized[key] != null)
-        .map((key) => "$key=${_formatConfigValue(normalized[key])}")
-        .join(", ");
-  }
-
-  String _summarizeProxyGroupOutbounds(dynamic entries) {
-    if (entries is! List) return "[]";
-    final groupTags = {"select", "lowest", "balance"};
-    final summary = entries.whereType<Map>().where((entry) => groupTags.contains("${entry["tag"]}")).map((entry) {
-      final normalized = entry.map((key, value) => MapEntry("$key", value));
-      return _summarizeConfigMap(normalized, [
-        "tag",
-        "type",
-        "default",
-        "strategy",
-        "outbounds",
-        "tolerance",
-        "delay_acceptable_ratio",
-        "interrupt_exist_connections",
-      ]);
-    });
-    return summary.isEmpty ? "[]" : summary.join("; ");
-  }
-
-  String _formatConfigValue(dynamic value) {
-    if (value is List) {
-      const limit = 8;
-      final shown = value.take(limit).join(",");
-      final suffix = value.length > limit ? ",... len=${value.length}" : "";
-      return "[$shown$suffix]";
-    }
-    if (value is Map) return jsonEncode(value);
-    return "$value";
   }
 
   void _logActiveGroupDiagnostics(List<OutboundGroup> groups) {

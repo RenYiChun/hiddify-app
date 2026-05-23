@@ -18,6 +18,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _processDirectRuleNamesSeparator = ";";
 
+const defaultProcessStableProxyRuleNames = [
+  "Codex.exe",
+  "codex.exe",
+  "codex-acp-x64-windows.exe",
+  "codex-x86_64-pc-windows-msvc.exe",
+];
+
+const defaultProcessStableProxyExcludedOutboundKeywords = ["naive", "quic", "tuic"];
+
 List<String> defaultProcessDirectRuleNamesForRegion(Region region) => switch (region) {
   Region.cn => const [
     "crashpad_handler.exe",
@@ -36,12 +45,24 @@ List<String> defaultProcessDirectRuleNamesForRegion(Region region) => switch (re
 };
 
 List<String> parseProcessDirectRuleNames(String value) =>
-    _cleanProcessDirectRuleNames(value.split(_processDirectRuleNamesSeparator));
+    _cleanStringList(value.split(_processDirectRuleNamesSeparator));
 
 String formatProcessDirectRuleNames(List<String> values) =>
-    _cleanProcessDirectRuleNames(values).join(_processDirectRuleNamesSeparator);
+    _cleanStringList(values).join(_processDirectRuleNamesSeparator);
 
-List<String> _cleanProcessDirectRuleNames(Iterable<String> values) {
+List<String> parseProcessStableProxyRuleNames(String value) =>
+    _cleanStringList(value.split(_processDirectRuleNamesSeparator));
+
+String formatProcessStableProxyRuleNames(List<String> values) =>
+    _cleanStringList(values).join(_processDirectRuleNamesSeparator);
+
+List<String> parseProcessStableProxyExcludedOutboundKeywords(String value) =>
+    _cleanStringList(value.split(_processDirectRuleNamesSeparator));
+
+String formatProcessStableProxyExcludedOutboundKeywords(List<String> values) =>
+    _cleanStringList(values).join(_processDirectRuleNamesSeparator);
+
+List<String> _cleanStringList(Iterable<String> values) {
   final names = <String>[];
   final seen = <String>{};
   for (final value in values) {
@@ -239,6 +260,32 @@ abstract class ConfigOptions {
     return defaultProcessDirectRuleNamesForRegion(ref.watch(region));
   });
 
+  static final enableProcessStableProxyRules = PreferencesNotifier.create<bool, bool>(
+    "enable-process-stable-proxy-rules",
+    true,
+  );
+
+  static final processStableProxyRuleNames = PreferencesNotifier.create<List<String>, String>(
+    "process-stable-proxy-rule-names",
+    const [],
+    mapFrom: parseProcessStableProxyRuleNames,
+    mapTo: formatProcessStableProxyRuleNames,
+  );
+
+  static final effectiveProcessStableProxyRuleNames = Provider<List<String>>((ref) {
+    final configured = ref.watch(processStableProxyRuleNames);
+    final preferences = ref.watch(sharedPreferencesProvider).requireValue;
+    if (preferences.containsKey("process-stable-proxy-rule-names")) return configured;
+    return defaultProcessStableProxyRuleNames;
+  });
+
+  static final processStableProxyExcludedOutboundKeywords = PreferencesNotifier.create<List<String>, String>(
+    "process-stable-proxy-excluded-outbound-keywords",
+    defaultProcessStableProxyExcludedOutboundKeywords,
+    mapFrom: parseProcessStableProxyExcludedOutboundKeywords,
+    mapTo: formatProcessStableProxyExcludedOutboundKeywords,
+  );
+
   static final enableDynamicDirectBypass = PreferencesNotifier.create<bool, bool>("enable-dynamic-direct-bypass", true);
 
   static final dynamicDirectBypassTtl = PreferencesNotifier.create<Duration, int>(
@@ -419,6 +466,9 @@ abstract class ConfigOptions {
     "proxy-route-connection-limit": proxyRouteConnectionLimit,
     "enable-process-direct-rules": enableProcessDirectRules,
     "process-direct-rule-names": processDirectRuleNames,
+    "enable-process-stable-proxy-rules": enableProcessStableProxyRules,
+    "process-stable-proxy-rule-names": processStableProxyRuleNames,
+    "process-stable-proxy-excluded-outbound-keywords": processStableProxyExcludedOutboundKeywords,
     "enable-dynamic-direct-bypass": enableDynamicDirectBypass,
     "dynamic-direct-bypass-ttl": dynamicDirectBypassTtl,
     "dynamic-direct-bypass-max-routes": dynamicDirectBypassMaxRoutes,
@@ -537,6 +587,9 @@ abstract class ConfigOptions {
       proxyRouteConnectionLimit: ref.watch(proxyRouteConnectionLimit),
       enableProcessDirectRules: ref.watch(enableProcessDirectRules),
       processDirectRuleNames: ref.watch(effectiveProcessDirectRuleNames),
+      enableProcessStableProxyRules: ref.watch(enableProcessStableProxyRules),
+      processStableProxyRuleNames: ref.watch(effectiveProcessStableProxyRuleNames),
+      processStableProxyExcludedOutboundKeywords: ref.watch(processStableProxyExcludedOutboundKeywords),
       enableDynamicDirectBypass: ref.watch(enableDynamicDirectBypass),
       dynamicDirectBypassTtl: ref.watch(dynamicDirectBypassTtl),
       dynamicDirectBypassMaxRoutes: ref.watch(dynamicDirectBypassMaxRoutes),

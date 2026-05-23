@@ -8,6 +8,7 @@ import 'package:hiddify/features/per_app_proxy/model/per_app_proxy_mode.dart';
 import 'package:hiddify/features/per_app_proxy/overview/per_app_proxy_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/features/settings/overview/sections/process_direct_rules_page.dart';
+import 'package:hiddify/features/settings/overview/sections/process_stable_proxy_rules_page.dart';
 import 'package:hiddify/features/settings/widget/preference_tile.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -20,6 +21,7 @@ class RouteOptionsPage extends HookConsumerWidget {
     final t = ref.watch(translationsProvider).requireValue;
     final perAppProxy = ref.watch(Preferences.perAppProxyMode).enabled;
     final processDirectRuleNames = ref.watch(ConfigOptions.effectiveProcessDirectRuleNames);
+    final processStableProxyRuleNames = ref.watch(ConfigOptions.effectiveProcessStableProxyRuleNames);
     return Scaffold(
       appBar: AppBar(title: Text(t.pages.settings.routing.title)),
       body: ListView(
@@ -107,6 +109,24 @@ class RouteOptionsPage extends HookConsumerWidget {
             onTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (context) => const ProcessDirectRulesPage(), fullscreenDialog: true)),
+          ),
+          SwitchListTile.adaptive(
+            title: const Text('启用进程稳定代理规则'),
+            subtitle: Text('${processStableProxyRuleNames.length} 个进程'),
+            secondary: const Icon(Icons.verified_user_rounded),
+            value: ref.watch(ConfigOptions.enableProcessStableProxyRules),
+            onChanged: ref.read(ConfigOptions.enableProcessStableProxyRules.notifier).update,
+          ),
+          ListTile(
+            title: const Text('进程稳定代理规则'),
+            subtitle: Text(
+              processStableProxyRuleNames.isEmpty ? t.common.empty : processStableProxyRuleNames.join(', '),
+              overflow: TextOverflow.ellipsis,
+            ),
+            leading: const Icon(Icons.shield_rounded),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const ProcessStableProxyRulesPage(), fullscreenDialog: true),
+            ),
           ),
           SwitchListTile.adaptive(
             title: Text(t.pages.settings.routing.resolveDestination),

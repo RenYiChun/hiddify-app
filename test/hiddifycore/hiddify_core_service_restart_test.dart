@@ -45,6 +45,29 @@ void main() {
     expect(normalized.directDnsDomainStrategy, DomainStrategy.preferIpv4);
     expect(normalized.remoteDnsDomainStrategy, DomainStrategy.ipv4Only);
   });
+
+  test('generated config diagnostics include process stable proxy candidates', () {
+    final summary = summarizeProxyGroupOutboundsForDiagnostics([
+      {
+        "tag": "select",
+        "type": "selector",
+        "outbounds": ["lowest", "balance"],
+      },
+      {
+        "tag": "process-stable-proxy §hide§",
+        "type": "selector",
+        "strategy": "lowest-delay",
+        "outbounds": [
+          "209.87.93.20 tls httpupgrade direct vless § 443 1",
+          "209.87.93.20 tls grpc direct vmess § 443 1",
+        ],
+      },
+    ]);
+
+    expect(summary, contains("tag=process-stable-proxy §hide§"));
+    expect(summary, contains("strategy=lowest-delay"));
+    expect(summary, contains("209.87.93.20 tls httpupgrade direct vless § 443 1"));
+  });
 }
 
 const _disabledWarp = SingboxWarpOption(
@@ -94,6 +117,9 @@ const _baseOptions = SingboxConfigOption(
   proxyRouteConnectionLimit: 128,
   enableProcessDirectRules: true,
   processDirectRuleNames: ["WXWork.exe"],
+  enableProcessStableProxyRules: true,
+  processStableProxyRuleNames: ["codex.exe"],
+  processStableProxyExcludedOutboundKeywords: ["naive", "quic", "tuic"],
   enableDynamicDirectBypass: true,
   dynamicDirectBypassTtl: Duration(minutes: 15),
   dynamicDirectBypassMaxRoutes: 128,

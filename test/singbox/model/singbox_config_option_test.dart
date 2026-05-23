@@ -38,6 +38,9 @@ void main() {
       proxyRouteConnectionLimit: 128,
       enableProcessDirectRules: true,
       processDirectRuleNames: ["WXWork.exe", "WeChat.exe"],
+      enableProcessStableProxyRules: true,
+      processStableProxyRuleNames: ["codex.exe"],
+      processStableProxyExcludedOutboundKeywords: ["naive", "quic", "tuic"],
       enableDynamicDirectBypass: true,
       dynamicDirectBypassTtl: Duration(minutes: 15),
       dynamicDirectBypassMaxRoutes: 128,
@@ -62,6 +65,9 @@ void main() {
     expect(json["proxy-route-connection-limit"], 128);
     expect(json["enable-process-direct-rules"], true);
     expect(json["process-direct-rule-names"], ["WXWork.exe", "WeChat.exe"]);
+    expect(json["enable-process-stable-proxy-rules"], true);
+    expect(json["process-stable-proxy-rule-names"], ["codex.exe"]);
+    expect(json["process-stable-proxy-excluded-outbound-keywords"], ["naive", "quic", "tuic"]);
     expect(json["enable-dynamic-direct-bypass"], true);
     expect(json.containsKey("dynamic-direct-bypass-threshold"), false);
     expect(json["dynamic-direct-bypass-ttl"], 900);
@@ -71,6 +77,9 @@ void main() {
     expect(SingboxConfigOption.fromJson(json).proxyRouteConnectionLimit, 128);
     expect(SingboxConfigOption.fromJson(json).enableProcessDirectRules, true);
     expect(SingboxConfigOption.fromJson(json).processDirectRuleNames, ["WXWork.exe", "WeChat.exe"]);
+    expect(SingboxConfigOption.fromJson(json).enableProcessStableProxyRules, true);
+    expect(SingboxConfigOption.fromJson(json).processStableProxyRuleNames, ["codex.exe"]);
+    expect(SingboxConfigOption.fromJson(json).processStableProxyExcludedOutboundKeywords, ["naive", "quic", "tuic"]);
     expect(SingboxConfigOption.fromJson(json).enableDynamicDirectBypass, true);
     expect(SingboxConfigOption.fromJson(json).dynamicDirectBypassTtl, const Duration(minutes: 15));
     expect(SingboxConfigOption.fromJson(json).dynamicDirectBypassMaxRoutes, 128);
