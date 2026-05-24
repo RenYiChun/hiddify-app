@@ -213,7 +213,7 @@ class HiddifyCoreService with InfraLogger {
       );
       loggy.info(
         "core generated config [$phase] custom: "
-        "${summarizeConfigMapForDiagnostics(decoded["custom"], ["hiddify-route-direct-connection-limit", "hiddify-route-proxy-connection-limit", "hiddify-process-stable-proxy-enabled", "hiddify-process-stable-proxy-rule-names", "hiddify-process-stable-proxy-excluded-keywords", "hiddify-process-stable-proxy-candidate-outbounds", "hiddify-process-stable-proxy-excluded-outbounds", "hiddify-dynamic-direct-bypass-enabled", "hiddify-dynamic-direct-bypass-ttl", "hiddify-dynamic-direct-bypass-max-routes", "hiddify-dynamic-direct-bypass-max-routes-per-host"])}",
+        "${summarizeConfigMapForDiagnostics(decoded["custom"], ["hiddify-route-direct-connection-limit", "hiddify-route-proxy-connection-limit", "hiddify-process-stable-proxy-enabled", "hiddify-process-stable-proxy-rule-names", "hiddify-process-stable-proxy-excluded-keywords", "hiddify-process-stable-proxy-candidate-outbounds", "hiddify-process-stable-proxy-excluded-outbounds", "hiddify-process-stable-proxy-fallback", "hiddify-process-stable-proxy-fallback-reason", "hiddify-dynamic-direct-bypass-enabled", "hiddify-dynamic-direct-bypass-ttl", "hiddify-dynamic-direct-bypass-max-routes", "hiddify-dynamic-direct-bypass-max-routes-per-host"])}",
       );
       loggy.info(
         "core generated config [$phase] proxy groups: "
