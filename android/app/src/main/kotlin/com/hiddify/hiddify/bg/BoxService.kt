@@ -84,7 +84,6 @@ class BoxService(
 //                it.fixAndroidStack = Bugs.fixAndroidStack
 //
 //            })
-            Libbox.redirectStderr(File(Settings.workingDir, "stderr.log").path)
             initializeOnce = true
             return
         }
