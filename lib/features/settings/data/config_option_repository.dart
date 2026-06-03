@@ -240,7 +240,7 @@ abstract class ConfigOptions {
 
   static final proxyRouteConnectionLimit = PreferencesNotifier.create<int, int>(
     "proxy-route-connection-limit",
-    256,
+    512,
     validator: (value) => value > 0,
   );
 

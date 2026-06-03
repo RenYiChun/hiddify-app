@@ -18,6 +18,7 @@ class PreferencesMigration with InfraLogger {
       PreferencesVersion4Migration(sharedPreferences),
       PreferencesVersion5Migration(sharedPreferences),
       PreferencesVersion6Migration(sharedPreferences),
+      PreferencesVersion7Migration(sharedPreferences),
     ];
 
     if (currentVersion == migrationSteps.length) {
@@ -128,6 +129,19 @@ class PreferencesVersion6Migration extends PreferencesMigrationStep with InfraLo
     if (sharedPreferences.getInt(_dynamicDirectBypassMaxRoutesKey) case 512) {
       loggy.debug("changing dynamic direct bypass max routes from [512] to [2048]");
       await sharedPreferences.setInt(_dynamicDirectBypassMaxRoutesKey, 2048);
+    }
+  }
+}
+
+class PreferencesVersion7Migration extends PreferencesMigrationStep with InfraLogger {
+  PreferencesVersion7Migration(super.sharedPreferences);
+
+  @override
+  Future<void> migrate() async {
+    if (sharedPreferences.getInt(_proxyRouteConnectionLimitKey) case final int limit
+        when limit == 128 || limit == 256) {
+      loggy.debug("changing proxy route connection limit from [$limit] to [512]");
+      await sharedPreferences.setInt(_proxyRouteConnectionLimitKey, 512);
     }
   }
 }

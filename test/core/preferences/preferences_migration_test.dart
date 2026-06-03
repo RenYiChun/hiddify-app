@@ -24,7 +24,7 @@ void main() {
         await PreferencesMigration(sharedPreferences: preferences).migrate();
 
         expect(preferences.getString(directDnsAddressKey), aliDnsTcpAddress);
-        expect(preferences.getInt(PreferencesMigration.versionKey), 6);
+        expect(preferences.getInt(PreferencesMigration.versionKey), 7);
       });
     }
 
@@ -38,7 +38,7 @@ void main() {
       await PreferencesMigration(sharedPreferences: preferences).migrate();
 
       expect(preferences.getString(directDnsAddressKey), aliDnsTcpAddress);
-      expect(preferences.getInt(PreferencesMigration.versionKey), 6);
+      expect(preferences.getInt(PreferencesMigration.versionKey), 7);
     });
 
     test("migrates previously saved AliDNS IP DoH from v3 to TCP", () async {
@@ -51,7 +51,7 @@ void main() {
       await PreferencesMigration(sharedPreferences: preferences).migrate();
 
       expect(preferences.getString(directDnsAddressKey), aliDnsTcpAddress);
-      expect(preferences.getInt(PreferencesMigration.versionKey), 6);
+      expect(preferences.getInt(PreferencesMigration.versionKey), 7);
     });
 
     test("keeps non-AliDNS direct DNS unchanged during migrations", () async {
@@ -65,7 +65,7 @@ void main() {
       await PreferencesMigration(sharedPreferences: preferences).migrate();
 
       expect(preferences.getString(directDnsAddressKey), customDirectDnsAddress);
-      expect(preferences.getInt(PreferencesMigration.versionKey), 6);
+      expect(preferences.getInt(PreferencesMigration.versionKey), 7);
     });
 
     test("raises persisted route connection limits that still use the old defaults", () async {
@@ -79,23 +79,23 @@ void main() {
       await PreferencesMigration(sharedPreferences: preferences).migrate();
 
       expect(preferences.getInt("direct-route-connection-limit"), 2048);
-      expect(preferences.getInt("proxy-route-connection-limit"), 256);
-      expect(preferences.getInt(PreferencesMigration.versionKey), 6);
+      expect(preferences.getInt("proxy-route-connection-limit"), 512);
+      expect(preferences.getInt(PreferencesMigration.versionKey), 7);
     });
 
     test("preserves custom route connection limits during migration", () async {
       SharedPreferences.setMockInitialValues({
         PreferencesMigration.versionKey: 4,
         "direct-route-connection-limit": 4096,
-        "proxy-route-connection-limit": 512,
+        "proxy-route-connection-limit": 768,
       });
       final preferences = await SharedPreferences.getInstance();
 
       await PreferencesMigration(sharedPreferences: preferences).migrate();
 
       expect(preferences.getInt("direct-route-connection-limit"), 4096);
-      expect(preferences.getInt("proxy-route-connection-limit"), 512);
-      expect(preferences.getInt(PreferencesMigration.versionKey), 6);
+      expect(preferences.getInt("proxy-route-connection-limit"), 768);
+      expect(preferences.getInt(PreferencesMigration.versionKey), 7);
     });
 
     test("raises persisted dynamic bypass defaults for all-direct bypass mode", () async {
@@ -110,7 +110,7 @@ void main() {
 
       expect(preferences.getInt("dynamic-direct-bypass-ttl"), 86400);
       expect(preferences.getInt("dynamic-direct-bypass-max-routes"), 2048);
-      expect(preferences.getInt(PreferencesMigration.versionKey), 6);
+      expect(preferences.getInt(PreferencesMigration.versionKey), 7);
     });
 
     test("preserves custom dynamic bypass limits during migration", () async {
@@ -125,7 +125,17 @@ void main() {
 
       expect(preferences.getInt("dynamic-direct-bypass-ttl"), 7200);
       expect(preferences.getInt("dynamic-direct-bypass-max-routes"), 4096);
-      expect(preferences.getInt(PreferencesMigration.versionKey), 6);
+      expect(preferences.getInt(PreferencesMigration.versionKey), 7);
+    });
+
+    test("raises persisted proxy route connection limit from v6 old default", () async {
+      SharedPreferences.setMockInitialValues({PreferencesMigration.versionKey: 6, "proxy-route-connection-limit": 256});
+      final preferences = await SharedPreferences.getInstance();
+
+      await PreferencesMigration(sharedPreferences: preferences).migrate();
+
+      expect(preferences.getInt("proxy-route-connection-limit"), 512);
+      expect(preferences.getInt(PreferencesMigration.versionKey), 7);
     });
   });
 }
