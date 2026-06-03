@@ -1,0 +1,5 @@
+# Latest Hiddify Weekly Sync Audit
+
+Latest snapshot: [`2026-06-03-hiddify-weekly-sync-audit.md`](./2026-06-03-hiddify-weekly-sync-audit.md)
+
+Use the dated snapshot for the full module-by-module detail. This file stays as the stable entrypoint for future runs across environments.
