@@ -335,17 +335,33 @@ class HiddifyCoreService with InfraLogger {
 
   TaskEither<ConnectionFailure, Unit> start(String path, String name, bool disableMemoryLimit) {
     return TaskEither(() async {
+      final startWatch = Stopwatch()..start();
       _stopInProgress = false;
       statusController.add(currentState = const CoreStatus.starting());
       loggy.debug("starting");
+      loggy.info("core start flow: begin disableMemoryLimit=$disableMemoryLimit");
+      var stageWatch = Stopwatch()..start();
       final background = await core.setupBackground(path, name);
+      loggy.info(
+        "core start flow: setupBackground took ${stageWatch.elapsedMilliseconds}ms "
+        "total=${startWatch.elapsedMilliseconds}ms state=$background",
+      );
       if (background != const CoreStatus.started()) {
         statusController.add(currentState = const CoreStatus.stopped());
+        loggy.warning(
+          "core start flow: setupBackground returned non-started state=$background "
+          "total=${startWatch.elapsedMilliseconds}ms",
+        );
         return left(background.getCoreAlert() ?? const ConnectionFailure.unexpected("failed to start core"));
       }
       if (!core.isSingleChannel()) {
+        stageWatch = Stopwatch()..start();
         await startListeningLogs("bg", core.bgClient);
         await startListeningStatus("bg", core.bgClient);
+        loggy.info(
+          "core start flow: startListening bg took ${stageWatch.elapsedMilliseconds}ms "
+          "total=${startWatch.elapsedMilliseconds}ms",
+        );
       }
       // if (latestOptions != null) {
       //   await core.bgClient.changeHiddifySettings(
@@ -357,16 +373,37 @@ class HiddifyCoreService with InfraLogger {
       // final content = await File(path).readAsString();
       // loggy.debug("starting with content: $content");
       try {
-        final res = await core.bgClient.start(
-          StartRequest(
-            configPath: path,
-            configName: name,
-            // configContent: content,
-            disableMemoryLimit: disableMemoryLimit,
-          ),
+        final grpcStartWatch = Stopwatch()..start();
+        final slowStartTimer = Timer(const Duration(seconds: 10), () {
+          loggy.warning(
+            "core start flow: bgClient.start still waiting after ${grpcStartWatch.elapsedMilliseconds}ms "
+            "total=${startWatch.elapsedMilliseconds}ms",
+          );
+        });
+        final CoreInfoResponse res;
+        try {
+          res = await core.bgClient.start(
+            StartRequest(
+              configPath: path,
+              configName: name,
+              // configContent: content,
+              disableMemoryLimit: disableMemoryLimit,
+            ),
+          );
+        } finally {
+          slowStartTimer.cancel();
+        }
+        loggy.info(
+          "core start flow: bgClient.start took ${grpcStartWatch.elapsedMilliseconds}ms "
+          "total=${startWatch.elapsedMilliseconds}ms response=${res.messageType.name}",
         );
         ref.read(coreRestartSignalProvider.notifier).restart();
+        stageWatch = Stopwatch()..start();
         await _logGeneratedConfigDiagnostics("start response ${res.messageType.name}");
+        loggy.info(
+          "core start flow: config diagnostics took ${stageWatch.elapsedMilliseconds}ms "
+          "total=${startWatch.elapsedMilliseconds}ms",
+        );
         if (res.messageType != MessageType.ALREADY_STARTED && res.messageType != MessageType.EMPTY) {
           final alert = res.message.contains("denied") ? CoreAlert.requestVPNPermission : CoreAlert.startFailed;
           currentState = CoreStatus.stopped(
@@ -381,9 +418,14 @@ class HiddifyCoreService with InfraLogger {
                 ConnectionFailure.unexpected("failed to start core ${res.messageType} ${res.message}"),
           );
         }
+        stageWatch = Stopwatch()..start();
         await _triggerActiveUrlTest("start");
+        loggy.info(
+          "core start flow: triggerActiveUrlTest took ${stageWatch.elapsedMilliseconds}ms "
+          "total=${startWatch.elapsedMilliseconds}ms",
+        );
       } on GrpcError catch (e) {
-        loggy.error("failed to start bg core: $e");
+        loggy.error("failed to start bg core after ${startWatch.elapsedMilliseconds}ms: $e");
         await _logGeneratedConfigDiagnostics("start grpc error");
         ref.read(coreRestartSignalProvider.notifier).restart();
         if (e.code == StatusCode.unavailable) {
@@ -398,6 +440,7 @@ class HiddifyCoreService with InfraLogger {
 
       // if (res.messageType != MessageType.EMPTY) return left(res);
 
+      loggy.info("core start flow: finished in ${startWatch.elapsedMilliseconds}ms");
       return right(unit);
     });
   }
