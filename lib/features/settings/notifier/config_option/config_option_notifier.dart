@@ -9,7 +9,6 @@ import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/features/connection/data/connection_data_providers.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
-import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/platform_utils.dart';
@@ -22,7 +21,7 @@ part 'config_option_notifier.g.dart';
 class ConfigOptionNotifier extends _$ConfigOptionNotifier with AppLogger {
   @override
   Future<bool> build() async {
-    final serviceRunning = await ref.watch(serviceRunningProvider.future);
+    final serviceRunning = ref.watch(serviceRunningProvider).valueOrNull ?? false;
     final serviceSingboxOptions = ref.read(connectionRepositoryProvider).configOptionsSnapshot;
 
     ref.listen(ConfigOptions.singboxConfigOptions, (previous, next) async {

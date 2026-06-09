@@ -1,4 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hiddify/core/directories/directories_provider.dart';
+import 'package:hiddify/core/model/directories.dart';
 import 'package:hiddify/core/model/region.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
@@ -29,7 +33,7 @@ void main() {
   test("enables bypass LAN by default", () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
-    final container = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) => preferences)]);
+    final container = await _createContainer(preferences);
     addTearDown(container.dispose);
 
     expect(container.read(ConfigOptions.bypassLan), isTrue);
@@ -38,7 +42,7 @@ void main() {
   test("uses CN process direct defaults before the user customizes the list", () async {
     SharedPreferences.setMockInitialValues({"region": "cn"});
     final preferences = await SharedPreferences.getInstance();
-    final container = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) => preferences)]);
+    final container = await _createContainer(preferences);
     addTearDown(container.dispose);
 
     expect(container.read(ConfigOptions.region), Region.cn);
@@ -50,7 +54,7 @@ void main() {
   test("applies CN process direct defaults after region changes before the user customizes the list", () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
-    final container = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) => preferences)]);
+    final container = await _createContainer(preferences);
     addTearDown(container.dispose);
 
     expect(container.read(ConfigOptions.region), Region.other);
@@ -64,7 +68,7 @@ void main() {
   test("keeps an empty process direct list after the user clears it", () async {
     SharedPreferences.setMockInitialValues({"region": "cn", "process-direct-rule-names": ""});
     final preferences = await SharedPreferences.getInstance();
-    final container = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) => preferences)]);
+    final container = await _createContainer(preferences);
     addTearDown(container.dispose);
 
     expect(container.read(ConfigOptions.processDirectRuleNames), isEmpty);
@@ -74,7 +78,7 @@ void main() {
   test("uses Codex process stable proxy defaults before the user customizes the list", () async {
     SharedPreferences.setMockInitialValues({});
     final preferences = await SharedPreferences.getInstance();
-    final container = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) => preferences)]);
+    final container = await _createContainer(preferences);
     addTearDown(container.dispose);
 
     expect(container.read(ConfigOptions.enableProcessStableProxyRules), isTrue);
@@ -91,10 +95,31 @@ void main() {
   test("keeps an empty process stable proxy list after the user clears it", () async {
     SharedPreferences.setMockInitialValues({"process-stable-proxy-rule-names": ""});
     final preferences = await SharedPreferences.getInstance();
-    final container = ProviderContainer(overrides: [sharedPreferencesProvider.overrideWith((ref) => preferences)]);
+    final container = await _createContainer(preferences);
     addTearDown(container.dispose);
 
     expect(container.read(ConfigOptions.processStableProxyRuleNames), isEmpty);
     expect(container.read(ConfigOptions.effectiveProcessStableProxyRuleNames), isEmpty);
   });
+}
+
+Future<ProviderContainer> _createContainer(SharedPreferences preferences) async {
+  final dir = await Directory.systemTemp.createTemp('config-options-');
+  final container = ProviderContainer(
+    overrides: [
+      sharedPreferencesProvider.overrideWith((ref) => preferences),
+      appDirectoriesProvider.overrideWith(() => _TestAppDirectories((baseDir: dir, workingDir: dir, tempDir: dir))),
+    ],
+  );
+  await container.read(appDirectoriesProvider.future);
+  return container;
+}
+
+class _TestAppDirectories extends AppDirectories {
+  _TestAppDirectories(this.directories);
+
+  final Directories directories;
+
+  @override
+  Future<Directories> build() async => directories;
 }

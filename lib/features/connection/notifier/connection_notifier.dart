@@ -57,7 +57,7 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
 
     yield* _connectionRepo.watchConnectionStatus().doOnData((event) {
       if (event case Disconnected(connectionFailure: final _?) when PlatformUtils.isDesktop) {
-        ref.read(Preferences.startedByUser.notifier).update(false);
+        Future.microtask(() => ref.read(Preferences.startedByUser.notifier).update(false));
       }
       loggy.info("connection status: ${event.format()}");
     });

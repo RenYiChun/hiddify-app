@@ -7,7 +7,6 @@ import 'package:hiddify/features/route_rules/data/running_process_repository.dar
 import 'package:hiddify/features/route_rules/notifier/generic_list_notifier.dart';
 import 'package:hiddify/features/route_rules/notifier/rule_notifier.dart';
 import 'package:hiddify/features/route_rules/overview/generic_list_page.dart';
-import 'package:hiddify/utils/utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class RunningProcessesPage extends HookConsumerWidget {
@@ -29,14 +28,7 @@ class RunningProcessesPage extends HookConsumerWidget {
     void openManualListPage() {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (context) => GenericListPage(
-            ruleListOrder: ruleListOrder,
-            ruleEnum: RuleEnum.processName,
-            validator: (value) {
-              if (isProcessName('$value')) return null;
-              return t.pages.settings.routing.routeRule.rule.validProcessName;
-            },
-          ),
+          builder: (context) => GenericListPage(ruleListOrder: ruleListOrder, ruleEnum: RuleEnum.processName),
           fullscreenDialog: true,
         ),
       );
@@ -84,7 +76,7 @@ class RunningProcessesPage extends HookConsumerWidget {
             controller: searchController,
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              label: Text(t.common.search),
+              label: const Text('Search'),
               suffixIcon: searchQuery.value.isNotEmpty
                   ? IconButton(
                       onPressed: () {

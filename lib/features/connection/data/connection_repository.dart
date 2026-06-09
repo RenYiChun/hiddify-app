@@ -1,5 +1,6 @@
 import 'package:fpdart/fpdart.dart';
 import 'package:hiddify/core/model/directories.dart';
+import 'package:hiddify/core/preferences/general_preferences.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/core/utils/exception_handler.dart';
 import 'package:hiddify/features/connection/data/windows_port_reservation_service.dart';
@@ -8,9 +9,8 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/profile/data/profile_path_resolver.dart';
 import 'package:hiddify/features/profile/model/profile_entity.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
-import 'package:hiddify/features/settings/notifier/warp_option/warp_option_notifier.dart';
-import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service.dart';
+import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
 import 'package:hiddify/singbox/model/core_status.dart';
 import 'package:hiddify/singbox/model/singbox_config_option.dart';
 import 'package:hiddify/utils/utils.dart';
@@ -100,17 +100,18 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
 
   @visibleForTesting
   TaskEither<ConnectionFailure, Unit> applyConfigOption(ProfileEntity prof) =>
-      TaskEither.fromEither(configOptionRepository.fullOptionsOverrided(prof.profileOverride))
+      TaskEither.fromEither(configOptionRepository.fullOptionsOverrided(prof.profileOverride()))
           .mapLeft((l) => ConnectionFailure.invalidConfigOption(null, l))
           .flatMap(
             (overridedOptions) => TaskEither.tryCatch(() async {
               final runtimeOptions = normalizeCoreRuntimeOptions(overridedOptions, logWarning: loggy.warning);
-              final isWarpLicenseAgreed = ref.read(warpLicenseNotifierProvider);
-              final isWarpEnabled = runtimeOptions.warp.enable || runtimeOptions.warp2.enable;
+              final isWarpLicenseAgreed = ref.read(Preferences.warpConsentGiven) == true;
+              final isWarpEnabled =
+                  runtimeOptions.unblocker.mode.isWarp() || runtimeOptions.extraSecurity.mode.isWarp();
               if (!isWarpLicenseAgreed && isWarpEnabled) {
                 final isAgreed = await ref.read(dialogNotifierProvider.notifier).showWarpLicense();
                 if (isAgreed == true) {
-                  await ref.read(warpLicenseNotifierProvider.notifier).agree();
+                  await ref.read(Preferences.warpConsentGiven.notifier).update(true);
                   // return (await applyConfigOption(prof).run()).match((l) => throw l, (_) => unit);
                 } else {
                   throw const MissingWarpLicense();

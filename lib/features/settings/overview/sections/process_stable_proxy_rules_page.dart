@@ -83,7 +83,7 @@ class ProcessStableProxyRulesPage extends HookConsumerWidget {
             controller: searchController,
             decoration: InputDecoration(
               contentPadding: const EdgeInsets.symmetric(horizontal: 16),
-              label: Text(t.common.search),
+              label: const Text('Search'),
               suffixIcon: searchQuery.value.isNotEmpty
                   ? IconButton(
                       onPressed: () {

@@ -70,25 +70,31 @@ void main() {
   });
 }
 
-const _disabledWarp = SingboxWarpOption(
-  enable: false,
-  mode: WarpDetourMode.warpOverProxy,
-  wireguardConfig: "{}",
-  licenseKey: "",
-  accountId: "",
-  accessToken: "",
-  cleanIp: "auto",
-  cleanPort: 0,
-  noise: OptionalRange(min: 1, max: 3),
-  noiseSize: OptionalRange(min: 10, max: 30),
-  noiseDelay: OptionalRange(min: 10, max: 30),
-  noiseMode: "m4",
+const _extraSecurity = SingboxExtraSecurityOption(
+  mode: ChainMode.warp,
+  warp: SingboxExtraSecurityWarpOption(licenseKey: ""),
+  psiphon: SingboxExtraSecurityPsiphonOption(region: PsiphonRegion.auto, conduitPairingId: ""),
+  profile: SingboxExtraSecurityProfileOption(id: null),
+);
+
+const _unblocker = SingboxUnblockerOption(
+  mode: ChainMode.psiphon,
+  warp: SingboxUnblockerWarpOption(
+    licenseKey: "",
+    cleanIp: "auto",
+    cleanPort: 0,
+    noise: OptionalRange(min: 1, max: 3),
+    noiseSize: OptionalRange(min: 10, max: 30),
+    noiseDelay: OptionalRange(min: 10, max: 30),
+    noiseMode: "m4",
+  ),
+  psiphon: SingboxUnblockerPsiphonOption(region: PsiphonRegion.auto, conduitPairingId: ""),
+  profile: SingboxUnblockerProfileOption(id: null),
 );
 
 const _baseOptions = SingboxConfigOption(
   region: "cn",
   balancerStrategy: BalancerStrategy.roundRobin,
-  blockAds: false,
   useXrayCoreWhenPossible: false,
   executeConfigAsIs: false,
   logLevel: LogLevel.warn,
@@ -126,7 +132,7 @@ const _baseOptions = SingboxConfigOption(
   dynamicDirectBypassMaxRoutesPerHost: 16,
   enableFakeDns: false,
   independentDnsCache: true,
-  rules: [],
+  routeRule: <String, dynamic>{},
   tlsTricks: SingboxTlsTricks(
     enableFragment: false,
     fragmentSize: OptionalRange(min: 10, max: 30),
@@ -135,6 +141,7 @@ const _baseOptions = SingboxConfigOption(
     enablePadding: false,
     paddingSize: OptionalRange(min: 1, max: 1500),
   ),
-  warp: _disabledWarp,
-  warp2: _disabledWarp,
+  chainStatus: ChainStatus.off,
+  extraSecurity: _extraSecurity,
+  unblocker: _unblocker,
 );

@@ -16,11 +16,14 @@ import 'package:hiddify/core/preferences/preferences_migration.dart';
 import 'package:hiddify/core/preferences/preferences_provider.dart';
 import 'package:hiddify/features/app/widget/app.dart';
 import 'package:hiddify/features/auto_start/notifier/auto_start_notifier.dart';
+import 'package:hiddify/features/chain/model/chain_enum.dart';
+import 'package:hiddify/features/chain/notifier/chain_profile_notifier.dart';
 
 import 'package:hiddify/features/connection/data/windows_port_reservation_service.dart';
 import 'package:hiddify/features/log/data/log_data_providers.dart';
 import 'package:hiddify/features/profile/data/profile_data_providers.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hiddify/features/system_tray/notifier/system_tray_notifier.dart';
 import 'package:hiddify/features/window/notifier/window_notifier.dart';
 import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
@@ -104,7 +107,19 @@ Future<void> lazyBootstrap(WidgetsBinding widgetsBinding, Environment env) async
     "windows port reservation",
     () => container.read(windowsPortReservationServiceProvider).ensureReserved(),
   );
+  await _init(
+    "chain profile extra security",
+    () => container.read(chainProfileNotifierProvider(ChainType.extraSecurity).future),
+  );
+  await _init(
+    "chain profile unblocker",
+    () => container.read(chainProfileNotifierProvider(ChainType.unblocker).future),
+  );
   await _init("hiddify-core", () => container.read(hiddifyCoreServiceProvider).init());
+
+  // Eagerly listen to activeProxyNotifierProvider to force synchronous evaluation in microtasks,
+  // avoiding lazy build-phase flushes and sibling dependency collisions on the Home page.
+  container.listen(activeProxyNotifierProvider, (previous, next) {});
 
   if (!kIsWeb) {
     // await _safeInit(
