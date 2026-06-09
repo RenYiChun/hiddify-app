@@ -105,18 +105,33 @@ class ConnectionRepositoryImpl with ExceptionHandler, InfraLogger implements Con
           .flatMap(
             (overridedOptions) => TaskEither.tryCatch(() async {
               final runtimeOptions = normalizeCoreRuntimeOptions(overridedOptions, logWarning: loggy.warning);
-              final isWarpLicenseAgreed = ref.read(Preferences.warpConsentGiven) == true;
-              final isWarpEnabled =
-                  runtimeOptions.unblocker.mode.isWarp() || runtimeOptions.extraSecurity.mode.isWarp();
-              if (!isWarpLicenseAgreed && isWarpEnabled) {
-                final isAgreed = await ref.read(dialogNotifierProvider.notifier).showWarpLicense();
-                if (isAgreed == true) {
-                  await ref.read(Preferences.warpConsentGiven.notifier).update(true);
-                  // return (await applyConfigOption(prof).run()).match((l) => throw l, (_) => unit);
-                } else {
-                  throw const MissingWarpLicense();
+              if (!runtimeOptions.chainStatus.isOff()) {
+                final isWarpLicenseAgreed = ref.read(Preferences.warpConsentGiven) == true;
+                final isWarpEnabled =
+                    runtimeOptions.unblocker.mode.isWarp() || runtimeOptions.extraSecurity.mode.isWarp();
+                if (!isWarpLicenseAgreed && isWarpEnabled) {
+                  final isAgreed = await ref.read(dialogNotifierProvider.notifier).showWarpLicense();
+                  if (isAgreed == true) {
+                    await ref.read(Preferences.warpConsentGiven.notifier).update(true);
+                    // return (await applyConfigOption(prof).run()).match((l) => throw l, (_) => unit);
+                  } else {
+                    throw const MissingWarpLicense();
+                  }
+                }
+
+                final isPsiphonLicenseAgreed = ref.read(Preferences.psiphonConsentGiven) == true;
+                final isPsiphonEnabled =
+                    runtimeOptions.unblocker.mode.isPsiphon() || runtimeOptions.extraSecurity.mode.isPsiphon();
+                if (!isPsiphonLicenseAgreed && isPsiphonEnabled) {
+                  final isAgreed = await ref.read(dialogNotifierProvider.notifier).showPsiphonLicense();
+                  if (isAgreed == true) {
+                    await ref.read(Preferences.psiphonConsentGiven.notifier).update(true);
+                  } else {
+                    throw const MissingPsiphonLicense();
+                  }
                 }
               }
+
               if (runtimeOptions.enableTun) {
                 final portsReserved = await windowsPortReservationService.ensureReserved();
                 if (!portsReserved) {
