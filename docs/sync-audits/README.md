@@ -7,4 +7,5 @@ Use these files as the portable record across machines and Codex environments. T
 Files:
 - `latest.md`: stable pointer to the most recent audit result
 - `sync-policy.md`: current sync mode and decision rules
+- `last-catch-up-baseline.md`: stable record of the last fully published catch-up positions
 - `YYYY-MM-DD-hiddify-weekly-sync-audit.md`: immutable per-run snapshot
