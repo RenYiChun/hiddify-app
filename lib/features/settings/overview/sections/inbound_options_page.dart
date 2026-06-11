@@ -48,6 +48,7 @@ class InboundOptionsPage extends HookConsumerWidget {
             inputToValue: int.tryParse,
             digitsOnly: true,
             validateInput: isPort,
+            trailing: SwitchPreferenceWidget(preference: ConfigOptions.enableMixedPort),
           ),
           if (PlatformUtils.isLinux)
             ValuePreferenceWidget(
@@ -58,6 +59,7 @@ class InboundOptionsPage extends HookConsumerWidget {
               inputToValue: int.tryParse,
               digitsOnly: true,
               validateInput: isPort,
+              trailing: SwitchPreferenceWidget(preference: ConfigOptions.enableTproxyPort),
             ),
           if (PlatformUtils.isLinux || PlatformUtils.isMacOS)
             ValuePreferenceWidget(
@@ -68,6 +70,7 @@ class InboundOptionsPage extends HookConsumerWidget {
               inputToValue: int.tryParse,
               digitsOnly: true,
               validateInput: isPort,
+              trailing: SwitchPreferenceWidget(preference: ConfigOptions.enableRedirectPort),
             ),
           ValuePreferenceWidget(
             value: ref.watch(ConfigOptions.directPort),
@@ -77,6 +80,7 @@ class InboundOptionsPage extends HookConsumerWidget {
             inputToValue: int.tryParse,
             digitsOnly: true,
             validateInput: isPort,
+            trailing: SwitchPreferenceWidget(preference: ConfigOptions.enableDirectPort),
           ),
           SwitchListTile.adaptive(
             title: Text(t.pages.settings.inbound.allowConnectionFromLan),
