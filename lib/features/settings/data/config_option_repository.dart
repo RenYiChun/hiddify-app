@@ -237,6 +237,8 @@ abstract class ConfigOptions {
 
   static final allowConnectionFromLan = PreferencesNotifier.create<bool, bool>("allow-connection-from-lan", false);
 
+  static final lanSharingPassword = PreferencesNotifier.create<String, String>("lan_sharing_password", "");
+
   static final directRouteConnectionLimit = PreferencesNotifier.create<int, int>(
     "direct-route-connection-limit",
     2048,
@@ -476,7 +478,11 @@ abstract class ConfigOptions {
   });
 
   /// preferences to exclude from share and export
-  static final privatePreferencesKeys = {"extra-security.warp.license-key", "unblocker.warp.license-key"};
+  static final privatePreferencesKeys = {
+    "extra-security.warp.license-key",
+    "unblocker.warp.license-key",
+    "lan-sharing-password",
+  };
 
   static final Map<String, StateNotifierProvider<PreferencesNotifier, dynamic>> preferences = {
     "region": region,
@@ -507,6 +513,7 @@ abstract class ConfigOptions {
     "clash-api-port": clashApiPort,
     "bypass-lan": bypassLan,
     "allow-connection-from-lan": allowConnectionFromLan,
+    "lan-sharing-password": lanSharingPassword,
     "direct-route-connection-limit": directRouteConnectionLimit,
     "proxy-route-connection-limit": proxyRouteConnectionLimit,
     "enable-process-direct-rules": enableProcessDirectRules,
@@ -637,6 +644,7 @@ abstract class ConfigOptions {
       setSystemProxy: mode == ServiceMode.systemProxy,
       bypassLan: ref.watch(bypassLan),
       allowConnectionFromLan: ref.watch(allowConnectionFromLan),
+      lanSharingPassword: ref.watch(lanSharingPassword),
       directRouteConnectionLimit: ref.watch(directRouteConnectionLimit),
       proxyRouteConnectionLimit: ref.watch(proxyRouteConnectionLimit),
       enableProcessDirectRules: ref.watch(enableProcessDirectRules),

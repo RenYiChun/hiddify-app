@@ -47,6 +47,7 @@ class SingboxConfigOption with _$SingboxConfigOption {
     required bool setSystemProxy,
     required bool bypassLan,
     required bool allowConnectionFromLan,
+    required String lanSharingPassword,
     required int directRouteConnectionLimit,
     required int proxyRouteConnectionLimit,
     required bool enableProcessDirectRules,
