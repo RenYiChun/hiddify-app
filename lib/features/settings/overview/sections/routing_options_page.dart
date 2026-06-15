@@ -21,7 +21,10 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:humanizer/humanizer.dart';
 
 class RoutingOptionsPage extends HookConsumerWidget {
-  const RoutingOptionsPage({super.key});
+  const RoutingOptionsPage({super.key, required this.routeRule});
+
+  // Import route rule from deep link
+  final String? routeRule;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -72,6 +75,13 @@ class RoutingOptionsPage extends HookConsumerWidget {
       ),
     ];
 
+    useMemoized(() {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (routeRule != null && context.mounted) {
+          await ref.read(rulesNotifierProvider.notifier).importRulesFromDeepLink(routeRule!);
+        }
+      });
+    });
     return Scaffold(
       appBar: AppBar(
         title: Text(t.pages.settings.routing.title),
