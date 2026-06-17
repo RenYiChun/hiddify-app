@@ -3,6 +3,7 @@
 import 'dart:io';
 
 import 'package:loggy/loggy.dart';
+import 'package:path/path.dart' as p;
 
 class ConsolePrinter extends LoggyPrinter {
   const ConsolePrinter({this.showColors = false});
@@ -46,6 +47,7 @@ class ConsolePrinter extends LoggyPrinter {
 class FileLogPrinter extends LoggyPrinter {
   FileLogPrinter(String filePath, {this.minLevel = LogLevel.debug}) : _logFile = File(filePath) {
     _logFile.parent.createSync(recursive: true);
+    _backupExistingLog();
     _logFile.writeAsStringSync("");
   }
 
@@ -68,4 +70,33 @@ class FileLogPrinter extends LoggyPrinter {
   }
 
   void dispose() {}
+
+  void _backupExistingLog() {
+    try {
+      if (!_logFile.existsSync() || _logFile.lengthSync() == 0) return;
+      _logFile.copySync(_nextBackupFile().path);
+    } on FileSystemException {
+      // Keep startup behavior best-effort if the old log cannot be copied.
+    }
+  }
+
+  File _nextBackupFile() {
+    final baseName = p.basenameWithoutExtension(_logFile.path);
+    final extension = p.extension(_logFile.path);
+    final timestamp = _formatBackupTimestamp(DateTime.now());
+    for (var i = 0; i < 1000; i++) {
+      final suffix = i == 0 ? "" : "-$i";
+      final candidate = File(p.join(_logFile.parent.path, "$baseName.backup-$timestamp$suffix$extension"));
+      if (!candidate.existsSync()) return candidate;
+    }
+    return File(
+      p.join(_logFile.parent.path, "$baseName.backup-$timestamp-${DateTime.now().microsecondsSinceEpoch}$extension"),
+    );
+  }
+
+  String _formatBackupTimestamp(DateTime time) {
+    String two(int value) => value.toString().padLeft(2, "0");
+    String three(int value) => value.toString().padLeft(3, "0");
+    return "${time.year}${two(time.month)}${two(time.day)}-${two(time.hour)}${two(time.minute)}${two(time.second)}${three(time.millisecond)}";
+  }
 }
