@@ -1,6 +1,6 @@
 # Latest Hiddify Weekly Sync Audit
 
-Latest snapshot: [`2026-06-10-hiddify-weekly-sync-audit.md`](./2026-06-10-hiddify-weekly-sync-audit.md)
+Latest snapshot: [`2026-06-17-hiddify-weekly-sync-audit.md`](./2026-06-17-hiddify-weekly-sync-audit.md)
 
 Current policy: [`sync-policy.md`](./sync-policy.md)
 
