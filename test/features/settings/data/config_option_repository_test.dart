@@ -39,6 +39,17 @@ void main() {
     expect(container.read(ConfigOptions.bypassLan), isTrue);
   });
 
+  test("keeps LAN sharing password private and in config options", () async {
+    SharedPreferences.setMockInitialValues({"lan_sharing_password": "secret"});
+    final preferences = await SharedPreferences.getInstance();
+    final container = await _createContainer(preferences);
+    addTearDown(container.dispose);
+
+    expect(ConfigOptions.privatePreferencesKeys, contains("lan-sharing-password"));
+    expect(container.read(ConfigOptions.lanSharingPassword), "secret");
+    expect(container.read(ConfigOptions.singboxConfigOptions).lanSharingPassword, "secret");
+  });
+
   test("uses CN process direct defaults before the user customizes the list", () async {
     SharedPreferences.setMockInitialValues({"region": "cn"});
     final preferences = await SharedPreferences.getInstance();

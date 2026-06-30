@@ -5,8 +5,8 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/core/notification/in_app_notification_controller.dart';
 import 'package:hiddify/core/router/dialog/dialog_notifier.dart';
 import 'package:hiddify/features/settings/data/config_option_repository.dart';
-import 'package:hiddify/hiddifycore/hiddify_core_service_provider.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 
 class LanSharingPreferenceWidget extends HookConsumerWidget {
   const LanSharingPreferenceWidget({super.key});
@@ -17,8 +17,7 @@ class LanSharingPreferenceWidget extends HookConsumerWidget {
     final theme = Theme.of(context);
 
     Future<String?> getSharingLink() async {
-      final ipResult = await ref.read(hiddifyCoreServiceProvider).getLANIP().run();
-      final ip = ipResult.fold((_) => null, (r) => r.ip);
+      final ip = await NetworkInfo().getWifiIP();
       if (ip == null) {
         ref.read(inAppNotificationControllerProvider).showErrorToast(t.pages.settings.inbound.lanIPError);
         return null;

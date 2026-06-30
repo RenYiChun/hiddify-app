@@ -22,6 +22,10 @@ void main() {
       tproxyPort: 12335,
       directPort: 12337,
       redirectPort: 12336,
+      enableMixedPort: true,
+      enableTproxyPort: true,
+      enableDirectPort: true,
+      enableRedirectPort: true,
       tunImplementation: TunImplementation.gvisor,
       mtu: 9000,
       strictRoute: true,
@@ -33,6 +37,7 @@ void main() {
       setSystemProxy: false,
       bypassLan: true,
       allowConnectionFromLan: false,
+      lanSharingPassword: "secret",
       directRouteConnectionLimit: 512,
       proxyRouteConnectionLimit: 128,
       enableProcessDirectRules: true,
@@ -62,6 +67,7 @@ void main() {
 
     final json = options.toJson();
     expect(json["direct-route-connection-limit"], 512);
+    expect(json["lan-sharing-password"], "secret");
     expect(json["proxy-route-connection-limit"], 128);
     expect(json["enable-process-direct-rules"], true);
     expect(json["process-direct-rule-names"], ["WXWork.exe", "WeChat.exe"]);
@@ -74,6 +80,7 @@ void main() {
     expect(json["dynamic-direct-bypass-max-routes"], 128);
     expect(json["dynamic-direct-bypass-max-routes-per-host"], 16);
     expect(SingboxConfigOption.fromJson(json).directRouteConnectionLimit, 512);
+    expect(SingboxConfigOption.fromJson(json).lanSharingPassword, "secret");
     expect(SingboxConfigOption.fromJson(json).proxyRouteConnectionLimit, 128);
     expect(SingboxConfigOption.fromJson(json).enableProcessDirectRules, true);
     expect(SingboxConfigOption.fromJson(json).processDirectRuleNames, ["WXWork.exe", "WeChat.exe"]);
