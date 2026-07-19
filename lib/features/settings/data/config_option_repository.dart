@@ -28,6 +28,8 @@ const defaultProcessStableProxyRuleNames = [
 
 const defaultProcessStableProxyExcludedOutboundKeywords = ["naive", "quic", "tuic"];
 
+const requiredCnProcessDirectRuleNames = ["微信开发者工具.exe"];
+
 List<String> defaultProcessDirectRuleNamesForRegion(Region region) => switch (region) {
   Region.cn => const [
     "crashpad_handler.exe",
@@ -41,9 +43,13 @@ List<String> defaultProcessDirectRuleNamesForRegion(Region region) => switch (re
     "Weixin.exe",
     "DingTalk.exe",
     "DingTalkHelper.exe",
+    ...requiredCnProcessDirectRuleNames,
   ],
   _ => const [],
 };
+
+List<String> ensureRequiredProcessDirectRuleNames(List<String> configured, Region region) =>
+    region == Region.cn ? _cleanStringList([...configured, ...requiredCnProcessDirectRuleNames]) : configured;
 
 List<String> parseProcessDirectRuleNames(String value) =>
     _cleanStringList(value.split(_processDirectRuleNamesSeparator));
@@ -165,22 +171,22 @@ abstract class ConfigOptions {
 
   static final mixedPort = PreferencesNotifier.create<int, int>(
     "mixed-port",
-    12334,
+    12434,
     validator: (value) => isPort(value.toString()),
   );
   static final tproxyPort = PreferencesNotifier.create<int, int>(
     "tproxy-port",
-    12335,
+    12435,
     validator: (value) => isPort(value.toString()),
   );
   static final redirectPort = PreferencesNotifier.create<int, int>(
     "redirect-port",
-    12336,
+    12436,
     validator: (value) => isPort(value.toString()),
   );
   static final directPort = PreferencesNotifier.create<int, int>(
     "direct-port",
-    12337,
+    12437,
     validator: (value) => isPort(value.toString()),
   );
 
@@ -229,7 +235,7 @@ abstract class ConfigOptions {
 
   static final clashApiPort = PreferencesNotifier.create<int, int>(
     "clash-api-port",
-    16756,
+    16757,
     validator: (value) => isPort(value.toString()),
   );
 
@@ -263,8 +269,11 @@ abstract class ConfigOptions {
   static final effectiveProcessDirectRuleNames = Provider<List<String>>((ref) {
     final configured = ref.watch(processDirectRuleNames);
     final preferences = ref.watch(sharedPreferencesProvider).requireValue;
-    if (preferences.containsKey("process-direct-rule-names")) return configured;
-    return defaultProcessDirectRuleNamesForRegion(ref.watch(region));
+    final selectedRegion = ref.watch(region);
+    if (preferences.containsKey("process-direct-rule-names")) {
+      return ensureRequiredProcessDirectRuleNames(configured, selectedRegion);
+    }
+    return defaultProcessDirectRuleNamesForRegion(selectedRegion);
   });
 
   static final enableProcessStableProxyRules = PreferencesNotifier.create<bool, bool>(

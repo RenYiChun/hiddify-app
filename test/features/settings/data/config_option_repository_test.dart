@@ -22,6 +22,7 @@ void main() {
     "Weixin.exe",
     "DingTalk.exe",
     "DingTalkHelper.exe",
+    "微信开发者工具.exe",
   ];
   const codexStableProxyDefaults = [
     "Codex.exe",
@@ -76,14 +77,14 @@ void main() {
     expect(container.read(ConfigOptions.singboxConfigOptions).processDirectRuleNames, cnProcessDirectDefaults);
   });
 
-  test("keeps an empty process direct list after the user clears it", () async {
+  test("keeps the required WeChat DevTools process direct after the user clears the list", () async {
     SharedPreferences.setMockInitialValues({"region": "cn", "process-direct-rule-names": ""});
     final preferences = await SharedPreferences.getInstance();
     final container = await _createContainer(preferences);
     addTearDown(container.dispose);
 
     expect(container.read(ConfigOptions.processDirectRuleNames), isEmpty);
-    expect(container.read(ConfigOptions.effectiveProcessDirectRuleNames), isEmpty);
+    expect(container.read(ConfigOptions.effectiveProcessDirectRuleNames), requiredCnProcessDirectRuleNames);
   });
 
   test("uses Codex process stable proxy defaults before the user customizes the list", () async {

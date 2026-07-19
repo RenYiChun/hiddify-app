@@ -15,7 +15,7 @@ class WindowsPortReservationService with InfraLogger {
 
   static const addressFamilies = ["ipv4", "ipv6"];
   static const protocols = ["tcp", "udp"];
-  static const reservedRanges = [PortRange(12334, 12337), PortRange(16756, 16756), PortRange(17078, 17078)];
+  static const reservedRanges = [PortRange(12434, 12437), PortRange(16757, 16757), PortRange(17079, 17079)];
 
   final ProcessRunner _processRunner;
   bool _promptedThisSession = false;

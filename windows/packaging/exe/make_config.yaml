@@ -1,9 +1,9 @@
-app_id: 6L903538-42B1-4596-G479-BJ779F21A65D
-publisher: Hiddify
-publisher_url: https://github.com/hiddify/hiddify-app
-display_name: Hiddify
+app_id: 5D3E10A6-6E29-4F1D-9B7E-81F21A73D4C2
+publisher: RenYiChun
+publisher_url: https://github.com/RenYiChun/hiddify-app
+display_name: Hiddify Custom
 create_desktop_icon: true
-install_dir_name: "{autopf64}\\Hiddify"
+install_dir_name: "{autopf64}\\Hiddify Custom"
 setup_icon_file: windows\runner\resources\app_icon.ico
 locales:
   - ar

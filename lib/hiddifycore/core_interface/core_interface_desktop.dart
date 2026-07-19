@@ -56,7 +56,7 @@ class CoreInterfaceDesktop extends CoreInterface with InfraLogger {
     }
   }
 
-  final port = 17078;
+  final port = 17079;
   static String generateRandomPassword(int length) {
     const characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     final random = Random();

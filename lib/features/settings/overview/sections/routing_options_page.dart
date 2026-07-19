@@ -178,7 +178,8 @@ class RoutingOptionsPage extends HookConsumerWidget {
           SizeTransition(
             sizeFactor: CurvedAnimation(parent: animationController, curve: Curves.easeInOut),
             axisAlignment: -1,
-            child: Column(
+            child: _ScrollableGeneralOptions(
+              maxHeight: MediaQuery.sizeOf(context).height * 0.7,
               children: [
                 Divider(height: 4, thickness: 4, color: theme.colorScheme.primaryContainer),
                 ChoicePreferenceWidget(
@@ -356,6 +357,19 @@ class RoutingOptionsPage extends HookConsumerWidget {
       ),
     );
   }
+}
+
+class _ScrollableGeneralOptions extends StatelessWidget {
+  const _ScrollableGeneralOptions({required this.maxHeight, required this.children});
+
+  final double maxHeight;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+    constraints: BoxConstraints(maxHeight: maxHeight),
+    child: ListView(shrinkWrap: true, padding: EdgeInsets.zero, children: children),
+  );
 }
 
 class _FabMenuItem {
