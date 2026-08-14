@@ -26,7 +26,18 @@ const defaultProcessStableProxyRuleNames = [
   "codex-x86_64-pc-windows-msvc.exe",
 ];
 
-const defaultProcessStableProxyExcludedOutboundKeywords = ["naive", "quic", "tuic"];
+const defaultProcessStableProxyExcludedOutboundKeywords = [
+  "naive",
+  "quic",
+  "tuic",
+  "xhttp",
+  "httpupgrade",
+  " § 80",
+  "ssh",
+  "hysteria",
+  "mieru",
+  "wireguard",
+];
 
 const requiredCnProcessDirectRuleNames = ["微信开发者工具.exe"];
 

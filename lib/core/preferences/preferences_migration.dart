@@ -19,6 +19,7 @@ class PreferencesMigration with InfraLogger {
       PreferencesVersion5Migration(sharedPreferences),
       PreferencesVersion6Migration(sharedPreferences),
       PreferencesVersion7Migration(sharedPreferences),
+      PreferencesVersion8Migration(sharedPreferences),
     ];
 
     if (currentVersion == migrationSteps.length) {
@@ -143,6 +144,35 @@ class PreferencesVersion7Migration extends PreferencesMigrationStep with InfraLo
       loggy.debug("changing proxy route connection limit from [$limit] to [512]");
       await sharedPreferences.setInt(_proxyRouteConnectionLimitKey, 512);
     }
+  }
+}
+
+const _processStableProxyExcludedOutboundKeywordsKey = "process-stable-proxy-excluded-outbound-keywords";
+const _hardenedProcessStableProxyExcludedOutboundKeywords =
+    "naive;quic;tuic;xhttp;httpupgrade; § 80;ssh;hysteria;mieru;wireguard";
+
+class PreferencesVersion8Migration extends PreferencesMigrationStep with InfraLogger {
+  PreferencesVersion8Migration(super.sharedPreferences);
+
+  @override
+  Future<void> migrate() async {
+    if (sharedPreferences.getString(_processStableProxyExcludedOutboundKeywordsKey) case final String keywords
+        when _isLegacyProcessStableProxyExclusions(keywords)) {
+      loggy.debug("hardening the legacy process stable proxy exclusions");
+      await sharedPreferences.setString(
+        _processStableProxyExcludedOutboundKeywordsKey,
+        _hardenedProcessStableProxyExcludedOutboundKeywords,
+      );
+    }
+  }
+
+  bool _isLegacyProcessStableProxyExclusions(String value) {
+    final keywords = value
+        .split(";")
+        .map((keyword) => keyword.trim().toLowerCase())
+        .where((keyword) => keyword.isNotEmpty)
+        .toList();
+    return keywords.length == 3 && keywords[0] == "naive" && keywords[1] == "quic" && keywords[2] == "tuic";
   }
 }
 

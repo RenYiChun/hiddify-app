@@ -101,6 +101,13 @@ void main() {
       "naive",
       "quic",
       "tuic",
+      "xhttp",
+      "httpupgrade",
+      " § 80",
+      "ssh",
+      "hysteria",
+      "mieru",
+      "wireguard",
     ]);
   });
 
