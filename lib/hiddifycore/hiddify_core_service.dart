@@ -19,7 +19,6 @@ import 'package:hiddify/hiddifycore/init_signal.dart';
 import 'package:hiddify/singbox/model/core_status.dart';
 import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hiddify/singbox/model/singbox_config_option.dart';
-import 'package:hiddify/singbox/model/warp_account.dart';
 import 'package:hiddify/utils/custom_loggers.dart';
 import 'package:hiddify/utils/platform_utils.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -32,6 +31,58 @@ bool isRecoverableRestartGrpcDisconnect(GrpcError error) {
   if (error.code != StatusCode.unknown) return false;
   final message = error.message ?? "";
   return message.contains("HTTP/2 error") && message.contains("Connection is being forcefully terminated");
+}
+
+@visibleForTesting
+Stream<List<OutboundGroup>> freshCoreActiveGroups(Stream<List<OutboundGroup>> updates, {Duration? refreshInterval}) {
+  if (refreshInterval == null) return updates.startWith(const <OutboundGroup>[]);
+
+  var current = const <OutboundGroup>[];
+  return Rx.merge([
+    updates.doOnData((groups) => current = groups),
+    Stream.periodic(refreshInterval, (_) => current).where((groups) => groups.isNotEmpty),
+  ]).startWith(const <OutboundGroup>[]);
+}
+
+@visibleForTesting
+class FailedSelectedOutboundRetestGate {
+  FailedSelectedOutboundRetestGate({this.cooldown = const Duration(seconds: 30)});
+
+  final Duration cooldown;
+  String? _lastTag;
+  DateTime? _lastAttempt;
+
+  bool shouldRetest(List<OutboundGroup> groups, DateTime now) {
+    OutboundGroup? select;
+    for (final group in groups) {
+      if (group.tag == "select") {
+        select = group;
+        break;
+      }
+    }
+    if (select == null) return false;
+
+    OutboundInfo? selected;
+    for (final item in select.items) {
+      if (item.tag == select.selected || item.isSelected) {
+        selected = item;
+        break;
+      }
+    }
+    if (selected == null || selected.isGroup || selected.urlTestDelay <= 0) return false;
+    if (selected.urlTestDelay < 65000) {
+      _lastTag = null;
+      _lastAttempt = null;
+      return false;
+    }
+    if (_lastTag == selected.tag && _lastAttempt != null && now.difference(_lastAttempt!) < cooldown) {
+      return false;
+    }
+
+    _lastTag = selected.tag;
+    _lastAttempt = now;
+    return true;
+  }
 }
 
 typedef RuntimeOptionWarningLogger = void Function(String message);
@@ -123,6 +174,7 @@ class HiddifyCoreService with InfraLogger {
   final Map<String, StreamSubscription?> subscriptions = {};
   List<OutboundGroup> latest = [];
   String? _lastActiveGroupDiagnostics;
+  final _failedSelectedOutboundRetest = FailedSelectedOutboundRetestGate();
 
   Future<void> _triggerActiveUrlTest(String phase) async {
     try {
@@ -562,14 +614,17 @@ class HiddifyCoreService with InfraLogger {
     }
 
     try {
-      yield* core.bgClient
-          .mainOutboundsInfo(Empty())
-          .map((event) {
-            latest = event.items;
-            _logActiveGroupDiagnostics(latest);
-            return latest;
-          })
-          .startWith(latest);
+      yield* freshCoreActiveGroups(
+        core.bgClient.mainOutboundsInfo(Empty()).map((event) => event.items),
+        refreshInterval: Platform.isWindows ? const Duration(seconds: 30) : null,
+      ).map((groups) {
+        latest = groups;
+        _logActiveGroupDiagnostics(groups);
+        if (Platform.isWindows && _failedSelectedOutboundRetest.shouldRetest(groups, DateTime.now())) {
+          unawaited(_triggerActiveUrlTest("selected-node-test-failed"));
+        }
+        return groups;
+      });
     } catch (e) {
       loggy.error("error watching active groups: $e");
       rethrow;

@@ -683,13 +683,14 @@
     "connect": "连接",
     "connecting": "连接中...",
     "connected": "已连接",
+    "availableNodes": "可用 ${available}/${total} 个节点",
     "checking": "已启动，检测中",
     "outboundUnavailable": "已启动，出口不可用",
-    "currentOutboundUnavailable": "已连接，当前节点异常",
+    "currentOutboundUnavailable": "已连接，当前节点测速失败",
     "disconnect": "断开连接",
     "disconnecting": "断开连接中...",
     "reconnect": "重新连接",
-    "reconnectMsg": "正在重新连接以应用更改..."
+    "reconnectMsg": "正在重新连接..."
   },
   "errors": {
     "unexpected": "意外错误",

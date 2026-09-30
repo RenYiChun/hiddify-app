@@ -39,7 +39,12 @@ const defaultProcessStableProxyExcludedOutboundKeywords = [
   "wireguard",
 ];
 
-const requiredCnProcessDirectRuleNames = ["微信开发者工具.exe"];
+const requiredCnProcessDirectRuleNames = [
+  "微信开发者工具.exe",
+  "HillstoneSecureConnect.exe",
+  "HillstoneSecureConnectService.exe",
+  "HillstoneSecureConnectServiceD.exe",
+];
 
 List<String> defaultProcessDirectRuleNamesForRegion(Region region) => switch (region) {
   Region.cn => const [

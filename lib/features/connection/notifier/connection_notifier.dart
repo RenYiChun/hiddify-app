@@ -20,6 +20,36 @@ import 'package:sentry_flutter/sentry_flutter.dart';
 
 part 'connection_notifier.g.dart';
 
+/// The core may become usable even when the restart RPC has not returned yet.
+final reconnectProgressProvider = StateProvider<ReconnectProgress>((ref) => const ReconnectProgress());
+
+class ReconnectProgress {
+  const ReconnectProgress({this.pending = 0, this.sawCoreTransition = false, this.coreRecovered = false});
+
+  final int pending;
+  final bool sawCoreTransition;
+  final bool coreRecovered;
+
+  bool get isReconnecting => pending > 0 && !coreRecovered;
+
+  ReconnectProgress start() => ReconnectProgress(pending: pending + 1);
+
+  ReconnectProgress observe(ConnectionStatus status) {
+    if (pending == 0) return this;
+    if (status is Connecting || status is Disconnecting || status is Disconnected) {
+      return ReconnectProgress(pending: pending, sawCoreTransition: true);
+    }
+    if (status is Connected && sawCoreTransition) {
+      return ReconnectProgress(pending: pending, sawCoreTransition: true, coreRecovered: true);
+    }
+    return this;
+  }
+
+  ReconnectProgress finish() => pending <= 1
+      ? const ReconnectProgress()
+      : ReconnectProgress(pending: pending - 1, sawCoreTransition: sawCoreTransition, coreRecovered: coreRecovered);
+}
+
 @Riverpod(keepAlive: true)
 class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
   @override
@@ -56,6 +86,12 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
     ref.watch(coreRestartSignalProvider);
 
     yield* _connectionRepo.watchConnectionStatus().doOnData((event) {
+      final reconnectProgress = ref.read(reconnectProgressProvider.notifier);
+      final updatedProgress = reconnectProgress.state.observe(event);
+      if (updatedProgress.coreRecovered && !reconnectProgress.state.coreRecovered) {
+        loggy.info("core recovered during reconnect; showing live connection status");
+      }
+      reconnectProgress.state = updatedProgress;
       if (event case Disconnected(connectionFailure: final _?) when PlatformUtils.isDesktop) {
         Future.microtask(() => ref.read(Preferences.startedByUser.notifier).update(false));
       }
@@ -105,12 +141,25 @@ class ConnectionNotifier extends _$ConnectionNotifier with AppLogger {
       final dialogNotifier = ref.read(dialogNotifierProvider.notifier);
       final t = ref.read(translationsProvider).requireValue;
 
-      await startedByUser.update(true);
-      await connectionRepo.reconnect(profile, disableMemoryLimit).mapLeft((err) async {
-        loggy.warning("error reconnecting", err);
-        state = AsyncError(err, StackTrace.current);
+      final reconnectProgress = ref.read(reconnectProgressProvider.notifier);
+      reconnectProgress.state = reconnectProgress.state.start();
+      loggy.info("reconnect started; pending=${reconnectProgress.state.pending}");
+      ConnectionFailure? reconnectError;
+      try {
+        await startedByUser.update(true);
+        final result = await connectionRepo.reconnect(profile, disableMemoryLimit).run();
+        result.match((err) {
+          loggy.warning("error reconnecting", err);
+          state = AsyncError(err, StackTrace.current);
+          reconnectError = err;
+        }, (_) {});
+      } finally {
+        reconnectProgress.state = reconnectProgress.state.finish();
+        loggy.info("reconnect request finished; pending=${reconnectProgress.state.pending}");
+      }
+      if (reconnectError case final err?) {
         await dialogNotifier.showCustomAlertFromErr(err.present(t));
-      }).run();
+      }
     }
   }
 

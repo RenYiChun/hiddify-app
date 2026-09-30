@@ -118,12 +118,15 @@ class DioHttpClient with InfraLogger {
         ? "both"
         : "direct";
     final dio = _dio[mode]!;
-    return dio.download(
-      url,
-      path,
-      cancelToken: cancelToken,
-      options: _options(url, userAgent: userAgent, credentials: credentials),
-    );
+    final options = _options(url, userAgent: userAgent, credentials: credentials);
+    try {
+      return await dio.download(url, path, cancelToken: cancelToken, options: options);
+    } on DioException catch (error) {
+      if (mode != "both" || error.type == DioExceptionType.cancel || error.response != null) rethrow;
+      // A proxy can accept CONNECT and then fail during TLS. Dart does not try
+      // the DIRECT entry in findProxy after that failure.
+      return _dio["direct"]!.download(url, path, cancelToken: cancelToken, options: options);
+    }
   }
 
   Options _options(String url, {String? userAgent, ({String username, String password})? credentials}) {

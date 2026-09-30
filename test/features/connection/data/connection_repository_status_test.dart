@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hiddify/features/connection/data/connection_repository.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/hiddifycore/generated/v2/hcore/hcore.pb.dart';
+import 'package:hiddify/hiddifycore/hiddify_core_service.dart';
 import 'package:hiddify/singbox/model/core_status.dart';
 
 void main() {
@@ -102,6 +103,19 @@ void main() {
   });
 
   group("connectionStatusUpdatesFromCore", () {
+    test("starts a restarted core in checking until its own test result arrives", () async {
+      final statuses = await connectionStatusUpdatesFromCore(
+        Stream.value(const CoreStatus.started()),
+        () => freshCoreActiveGroups(
+          Stream.value([
+            _group("select", selected: "node-a", items: [_info("node-a", delay: 176)]),
+          ]),
+        ),
+      ).toList();
+
+      expect(statuses, [const Checking(), const Connected()]);
+    });
+
     test("marks already-started core checking until test evidence arrives", () async {
       final statuses = await connectionStatusUpdatesFromCore(
         Stream.value(const CoreStatus.started()),

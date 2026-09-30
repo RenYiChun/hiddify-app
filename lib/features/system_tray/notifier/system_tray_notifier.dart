@@ -25,14 +25,15 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
   @override
   Future<void> build() async {
     assert(PlatformUtils.isDesktop);
+    final isReconnecting = ref.watch(reconnectProgressProvider).isReconnecting;
     if (!listenerAdded) {
       trayManager.addListener(this);
       listenerAdded = true;
     }
-    await _initializeTray();
+    await _initializeTray(isReconnecting);
   }
 
-  Future<void> _initializeTray() async {
+  Future<void> _initializeTray(bool isReconnecting) async {
     final t = await ref.watch(translationsProvider.future);
     final urlTestDelay = await ref
         .watch(activeProxyNotifierProvider.future)
@@ -54,42 +55,54 @@ class SystemTrayNotifier extends _$SystemTrayNotifier with TrayListener, AppLogg
         .then((connection) => _modifyConnectionStatus(connection, urlTestDelay));
     final serviceMode = ref.watch(ConfigOptions.serviceMode);
 
-    await trayManager.setIcon(_trayIconPath(connection), isTemplate: PlatformUtils.isMacOS);
-    if (!PlatformUtils.isLinux) await trayManager.setToolTip(_trayTooltip(connection, urlTestDelay, t));
-    await trayManager.setContextMenu(_trayMenu(connection, serviceMode, t));
+    await trayManager.setIcon(
+      _trayIconPath(isReconnecting ? const Connecting() : connection),
+      isTemplate: PlatformUtils.isMacOS,
+    );
+    if (!PlatformUtils.isLinux) {
+      await trayManager.setToolTip(
+        isReconnecting
+            ? "${Constants.appName} - ${t.connection.reconnectMsg}"
+            : _trayTooltip(connection, urlTestDelay, t),
+      );
+    }
+    await trayManager.setContextMenu(_trayMenu(connection, serviceMode, t, isReconnecting: isReconnecting));
   }
 
-  Menu _trayMenu(ConnectionStatus connection, ServiceMode serviceMode, Translations t) => Menu(
-    items: [
-      if (PlatformUtils.isLinux) ...[MenuItem(key: 'dashboard', label: t.common.dashboard), MenuItem.separator()],
-      MenuItem(
-        key: 'connection',
-        label: switch (connection) {
-          Disconnected() => t.connection.connect,
-          Connecting() => t.connection.disconnect,
-          Connected() => t.connection.disconnect,
-          Checking() => t.connection.disconnect,
-          OutboundUnavailable() => t.connection.disconnect,
-          CurrentOutboundUnavailable() => t.connection.disconnect,
-          Disconnecting() => t.connection.disconnecting,
-        },
-        disabled: connection is Disconnecting,
-      ),
-      MenuItem.submenu(
-        label: t.pages.settings.inbound.serviceMode,
-        icon: Assets.images.trayIconIco,
-        submenu: Menu(
-          items: [
-            ...ServiceMode.values.map(
-              (e) => MenuItem.checkbox(checked: e == serviceMode, key: e.name, label: e.present(t)),
+  Menu _trayMenu(ConnectionStatus connection, ServiceMode serviceMode, Translations t, {bool isReconnecting = false}) =>
+      Menu(
+        items: [
+          if (PlatformUtils.isLinux) ...[MenuItem(key: 'dashboard', label: t.common.dashboard), MenuItem.separator()],
+          MenuItem(
+            key: 'connection',
+            label: isReconnecting
+                ? t.connection.reconnectMsg
+                : switch (connection) {
+                    Disconnected() => t.connection.connect,
+                    Connecting() => t.connection.disconnect,
+                    Connected() => t.connection.disconnect,
+                    Checking() => t.connection.disconnect,
+                    OutboundUnavailable() => t.connection.disconnect,
+                    CurrentOutboundUnavailable() => t.connection.disconnect,
+                    Disconnecting() => t.connection.disconnecting,
+                  },
+            disabled: isReconnecting || connection is Disconnecting,
+          ),
+          MenuItem.submenu(
+            label: t.pages.settings.inbound.serviceMode,
+            icon: Assets.images.trayIconIco,
+            submenu: Menu(
+              items: [
+                ...ServiceMode.values.map(
+                  (e) => MenuItem.checkbox(checked: e == serviceMode, key: e.name, label: e.present(t)),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
-      MenuItem.separator(),
-      MenuItem(key: 'quit', label: t.common.quit),
-    ],
-  );
+          ),
+          MenuItem.separator(),
+          MenuItem(key: 'quit', label: t.common.quit),
+        ],
+      );
 
   String _trayIconPath(ConnectionStatus status) {
     final isDarkMode = WidgetsBinding.instance.platformDispatcher.platformBrightness == Brightness.dark;

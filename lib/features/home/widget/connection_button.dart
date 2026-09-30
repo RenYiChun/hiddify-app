@@ -11,10 +11,9 @@ import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
-import 'package:hiddify/features/settings/data/config_option_repository.dart';
+import 'package:hiddify/features/proxy/data/proxy_availability.dart';
 import 'package:hiddify/features/settings/notifier/config_option/config_option_notifier.dart';
 import 'package:hiddify/gen/assets.gen.dart';
-import 'package:hiddify/singbox/model/singbox_config_enum.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 // TODO: rewrite
@@ -67,8 +66,10 @@ class _ConnectionButtonState extends ConsumerState<ConnectionButton> {
   Widget build(BuildContext context) {
     final t = ref.watch(translationsProvider).requireValue;
     final connectionStatus = ref.watch(connectionNotifierProvider);
+    final isReconnecting = ref.watch(reconnectProgressProvider).isReconnecting;
     final delay = _activeProxyDelay;
     final displayConnectionStatus = connectionStatus.valueOrNull?.withConnectivityDelay(delay);
+    final availability = ref.watch(proxyAvailabilityProvider).valueOrNull;
 
     final requiresReconnect = ref.watch(configOptionNotifierProvider).valueOrNull;
     final today = DateTime.now();
@@ -157,52 +158,63 @@ class _ConnectionButtonState extends ConsumerState<ConnectionButton> {
       secureLabel = "";
     }
     return _ConnectionButton(
-      onTap: switch (connectionStatus) {
-        AsyncData(value: Connected()) when requiresReconnect == true => () async {
-          final activeProfile = await ref.read(activeProfileProvider.future);
-          return await ref.read(connectionNotifierProvider.notifier).reconnect(activeProfile);
-        },
-        AsyncData(value: Disconnected()) || AsyncError() => () async {
-          if (ref.read(activeProfileProvider).valueOrNull == null) {
-            await ref.read(dialogNotifierProvider.notifier).showNoActiveProfile();
-            ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile();
-          }
-          if (await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
-            return await ref.read(connectionNotifierProvider.notifier).toggleConnection();
-          }
-        },
-        AsyncData(value: Connected()) => () async {
-          if (requiresReconnect == true &&
-              await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
-            return await ref
-                .read(connectionNotifierProvider.notifier)
-                .reconnect(await ref.read(activeProfileProvider.future));
-          }
-          return await ref.read(connectionNotifierProvider.notifier).toggleConnection();
-        },
-        AsyncData(value: Checking() || OutboundUnavailable() || CurrentOutboundUnavailable()) => () async {
-          return await ref.read(connectionNotifierProvider.notifier).toggleConnection();
-        },
-        AsyncData(value: Connecting()) => () async {
-          return await ref.read(connectionNotifierProvider.notifier).abortConnection();
-        },
-        _ => () {},
-      },
-      enabled: switch (connectionStatus) {
-        AsyncData(value: Connected()) ||
-        AsyncData(value: Checking()) ||
-        AsyncData(value: OutboundUnavailable()) ||
-        AsyncData(value: CurrentOutboundUnavailable()) ||
-        AsyncData(value: Connecting()) ||
-        AsyncData(value: Disconnected()) ||
-        AsyncError() => true,
-        _ => false,
-      },
-      label: switch (connectionStatus) {
-        AsyncData(value: Connected()) when requiresReconnect == true => t.connection.reconnect,
-        AsyncData() when displayConnectionStatus != null => displayConnectionStatus.present(t),
-        _ => "",
-      },
+      onTap: isReconnecting
+          ? () {}
+          : switch (connectionStatus) {
+              AsyncData(value: Connected()) when requiresReconnect == true => () async {
+                final activeProfile = await ref.read(activeProfileProvider.future);
+                return await ref.read(connectionNotifierProvider.notifier).reconnect(activeProfile);
+              },
+              AsyncData(value: Disconnected()) || AsyncError() => () async {
+                if (ref.read(activeProfileProvider).valueOrNull == null) {
+                  await ref.read(dialogNotifierProvider.notifier).showNoActiveProfile();
+                  ref.read(bottomSheetsNotifierProvider.notifier).showAddProfile();
+                }
+                if (await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
+                  return await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+                }
+              },
+              AsyncData(value: Connected()) => () async {
+                if (requiresReconnect == true &&
+                    await ref.read(dialogNotifierProvider.notifier).showExperimentalFeatureNotice()) {
+                  return await ref
+                      .read(connectionNotifierProvider.notifier)
+                      .reconnect(await ref.read(activeProfileProvider.future));
+                }
+                return await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+              },
+              AsyncData(value: Checking() || OutboundUnavailable() || CurrentOutboundUnavailable()) => () async {
+                return await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+              },
+              AsyncData(value: Connecting()) => () async {
+                return await ref.read(connectionNotifierProvider.notifier).abortConnection();
+              },
+              _ => () {},
+            },
+      enabled:
+          !isReconnecting &&
+          switch (connectionStatus) {
+            AsyncData(value: Connected()) ||
+            AsyncData(value: Checking()) ||
+            AsyncData(value: OutboundUnavailable()) ||
+            AsyncData(value: CurrentOutboundUnavailable()) ||
+            AsyncData(value: Connecting()) ||
+            AsyncData(value: Disconnected()) ||
+            AsyncError() => true,
+            _ => false,
+          },
+      label: isReconnecting
+          ? t.connection.reconnectMsg
+          : switch (connectionStatus) {
+              AsyncData(value: Connected()) when requiresReconnect == true => t.connection.reconnect,
+              AsyncData(value: Connected()) when availability != null && availability.total > 0 =>
+                "${t.connection.connected} · ${t.connection.availableNodes(available: availability.available, total: availability.total)}",
+              AsyncData(value: CurrentOutboundUnavailable())
+                  when displayConnectionStatus != null && availability != null && availability.total > 0 =>
+                "${displayConnectionStatus.present(t)} · ${t.connection.availableNodes(available: availability.available, total: availability.total)}",
+              AsyncData() when displayConnectionStatus != null => displayConnectionStatus.present(t),
+              _ => "",
+            },
       buttonColor: switch (connectionStatus) {
         AsyncData(value: Connected()) when requiresReconnect == true => Colors.teal,
         AsyncData(value: Checking()) => const Color.fromARGB(255, 185, 176, 103),

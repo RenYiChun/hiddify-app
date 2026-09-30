@@ -23,6 +23,9 @@ void main() {
     "DingTalk.exe",
     "DingTalkHelper.exe",
     "微信开发者工具.exe",
+    "HillstoneSecureConnect.exe",
+    "HillstoneSecureConnectService.exe",
+    "HillstoneSecureConnectServiceD.exe",
   ];
   const codexStableProxyDefaults = [
     "Codex.exe",
@@ -77,7 +80,7 @@ void main() {
     expect(container.read(ConfigOptions.singboxConfigOptions).processDirectRuleNames, cnProcessDirectDefaults);
   });
 
-  test("keeps the required WeChat DevTools process direct after the user clears the list", () async {
+  test("keeps the required CN process direct rules after the user clears the list", () async {
     SharedPreferences.setMockInitialValues({"region": "cn", "process-direct-rule-names": ""});
     final preferences = await SharedPreferences.getInstance();
     final container = await _createContainer(preferences);

@@ -683,13 +683,14 @@
     "connect": "Connect",
     "connecting": "Connecting...",
     "connected": "Connected",
+    "availableNodes": "${available}/${total} nodes available",
     "checking": "Started, checking...",
     "outboundUnavailable": "Started, outbound unavailable",
-    "currentOutboundUnavailable": "Connected, current outbound unavailable",
+    "currentOutboundUnavailable": "Connected, current node test failed",
     "disconnect": "Disconnect",
     "disconnecting": "Disconnecting...",
     "reconnect": "Reconnect",
-    "reconnectMsg": "Reconnecting for taking into account the changes..."
+    "reconnectMsg": "Reconnecting..."
   },
   "errors": {
     "unexpected": "Unexpected error",

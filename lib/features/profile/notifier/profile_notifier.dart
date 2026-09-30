@@ -121,10 +121,7 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
     ref.disposeDelay(const Duration(minutes: 1));
     listenSelf((previous, next) {
       final t = ref.read(translationsProvider).requireValue;
-      final notification = ref.read(inAppNotificationControllerProvider);
       switch (next) {
-        case AsyncData(value: final _?):
-          notification.showSuccessToast(t.pages.profiles.msg.update.success);
         case AsyncError(:final error):
           ref
               .read(dialogNotifierProvider.notifier)
@@ -148,19 +145,22 @@ class UpdateProfileNotifier extends _$UpdateProfileNotifier with AppLogger {
               loggy.warning("failed to update profile", err);
               throw err;
             },
-            (_) async {
+            (_) {
               loggy.info('successfully updated profile');
-
-              await ref.read(activeProfileProvider.future).then((active) async {
-                if (active != null && active.id == profile.id) {
-                  await ref.read(connectionNotifierProvider.notifier).reconnect(profile);
-                }
-              });
               return unit;
             },
           )
           .run();
     });
+    if (state case AsyncData(value: final _?)) {
+      ref
+          .read(inAppNotificationControllerProvider)
+          .showSuccessToast(ref.read(translationsProvider).requireValue.pages.profiles.msg.update.success);
+      final active = await ref.read(activeProfileProvider.future);
+      if (active != null && active.id == profile.id) {
+        await ref.read(connectionNotifierProvider.notifier).reconnect(active);
+      }
+    }
   }
 }
 
